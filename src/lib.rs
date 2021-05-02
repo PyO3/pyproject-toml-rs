@@ -98,7 +98,12 @@ pub struct People {
     pub email: Option<String>,
 }
 
-impl PyProjectToml {}
+impl PyProjectToml {
+    /// Parse `pyproject.toml` content
+    pub fn new(content: &str) -> Result<Self, toml::de::Error> {
+        toml::from_str(content)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -157,7 +162,7 @@ spam-gui = "spam:main_gui"
 
 [project.entry-points."spam.magical"]
 tomatoes = "spam:main_tomatoes""#;
-        let project_toml: PyProjectToml = toml::from_str(source).unwrap();
+        let project_toml = PyProjectToml::new(source).unwrap();
         let build_system = &project_toml.build_system;
         assert_eq!(build_system.requires, &["maturin"]);
         assert_eq!(build_system.build_backend, "maturin");
