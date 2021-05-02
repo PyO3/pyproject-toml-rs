@@ -5,16 +5,20 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildSystem {
-    requires: Vec<String>,
-    build_backend: String,
+    /// PEP 508 dependencies required to execute the build system
+    pub requires: Vec<String>,
+    /// A string naming a Python object that will be used to perform the build
+    pub build_backend: String,
 }
 
 /// A pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
-    build_system: BuildSystem,
-    project: Option<Project>,
+    /// Build-related data
+    pub build_system: BuildSystem,
+    /// Project metadata
+    pub project: Option<Project>,
 }
 
 /// PEP 621 project metadata
@@ -22,38 +26,40 @@ pub struct PyProjectToml {
 #[serde(rename_all = "kebab-case")]
 pub struct Project {
     /// The name of the project
-    name: String,
+    pub name: String,
     /// The version of the project as supported by PEP 440
-    version: Option<String>,
+    pub version: Option<String>,
     /// The summary description of the project
-    description: Option<String>,
+    pub description: Option<String>,
     /// The full description of the project (i.e. the README)
-    readme: Option<ReadMe>,
+    pub readme: Option<ReadMe>,
     /// The Python version requirements of the project
-    requires_python: Option<String>,
+    pub requires_python: Option<String>,
     /// License
-    license: Option<License>,
+    pub license: Option<License>,
     /// The people or organizations considered to be the "authors" of the project
-    authors: Option<Vec<People>>,
+    pub authors: Option<Vec<People>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation
-    maintainers: Option<Vec<People>>,
+    pub maintainers: Option<Vec<People>>,
     /// The keywords for the project
-    keywords: Option<Vec<String>>,
+    pub keywords: Option<Vec<String>>,
     /// Trove classifiers which apply to the project
-    classifiers: Option<Vec<String>>,
+    pub classifiers: Option<Vec<String>>,
     /// A table of URLs where the key is the URL label and the value is the URL itself
-    urls: HashMap<String, String>,
+    pub urls: Option<HashMap<String, String>>,
+    /// Entry points
+    pub entry_points: Option<HashMap<String, HashMap<String, String>>>,
     /// Corresponds to the console_scripts group in the core metadata
-    scripts: Option<HashMap<String, String>>,
+    pub scripts: Option<HashMap<String, String>>,
     /// Corresponds to the gui_scripts group in the core metadata
-    gui_scripts: Option<HashMap<String, String>>,
+    pub gui_scripts: Option<HashMap<String, String>>,
     /// Project dependencies
-    dependencies: Option<Vec<String>>,
+    pub dependencies: Option<Vec<String>>,
     /// Optional dependencies
-    optional_dependencies: Option<HashMap<String, Vec<String>>>,
+    pub optional_dependencies: Option<HashMap<String, Vec<String>>>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
-    dynamic: Option<Vec<String>>,
+    pub dynamic: Option<Vec<String>>,
 }
 
 /// The full description of the project (i.e. the README).
@@ -78,18 +84,18 @@ pub enum ReadMe {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct License {
     /// A relative file path to the file which contains the license for the project
-    file: Option<String>,
+    pub file: Option<String>,
     /// The license content of the project
-    text: Option<String>,
+    pub text: Option<String>,
 }
 
 /// Project people contact information
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct People {
     /// A valid email name
-    name: Option<String>,
+    pub name: Option<String>,
     /// A valid email address
-    email: Option<String>,
+    pub email: Option<String>,
 }
 
 impl PyProjectToml {}
@@ -168,5 +174,13 @@ tomatoes = "spam:main_tomatoes""#;
             Some(ReadMe::RelativePath("README.rst".to_string()))
         );
         assert_eq!(project.requires_python.as_deref(), Some(">=3.8"));
+        assert_eq!(
+            project.license.as_ref().unwrap().file.as_deref(),
+            Some("LICENSE.txt")
+        );
+        assert_eq!(
+            project.keywords.as_ref().unwrap(),
+            &["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
+        );
     }
 }
