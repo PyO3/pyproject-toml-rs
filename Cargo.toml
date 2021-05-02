@@ -2,6 +2,7 @@
 name = "pyproject-toml"
 version = "0.1.0"
 authors = ["messense <messense@icloud.com>"]
+description = "pyproject.toml parser in Rust"
 edition = "2018"
 license = "MIT"
 keywords = ["pyproject", "pep517", "pep621"]
