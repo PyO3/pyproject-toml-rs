@@ -187,5 +187,13 @@ tomatoes = "spam:main_tomatoes""#;
             project.keywords.as_ref().unwrap(),
             &["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
         );
+        assert_eq!(
+            project.scripts.as_ref().unwrap()["spam-cli"],
+            "spam:main_cli"
+        );
+        assert_eq!(
+            project.gui_scripts.as_ref().unwrap()["spam-gui"],
+            "spam:main_gui"
+        );
     }
 }
