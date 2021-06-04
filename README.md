@@ -1,6 +1,6 @@
 # pyproject-toml-rs
 
-[![GitHub Actions](https://github.com/messense/pyproject-toml-rs/workflows/CI/badge.svg)](https://github.com/messense/pyproject-toml-rs/actions?query=workflow%3ACI)
+[![GitHub Actions](https://github.com/PyO3/pyproject-toml-rs/workflows/CI/badge.svg)](https://github.com/PyO3/pyproject-toml-rs/actions?query=workflow%3ACI)
 [![Crates.io](https://img.shields.io/crates/v/pyproject-toml.svg)](https://crates.io/crates/pyproject-toml)
 [![docs.rs](https://docs.rs/pyproject-toml/badge.svg)](https://docs.rs/pyproject-toml/)
 
@@ -15,7 +15,7 @@ Add it to your ``Cargo.toml``:
 pyproject-toml = "0.1"
 ```
 
-then you are good to go. If you are using Rust 2015 you have to add ``extern crate pyproject_toml`` to your crate root as well. 
+then you are good to go. If you are using Rust 2015 you have to add ``extern crate pyproject_toml`` to your crate root as well.
 
 ## Extended parsing
 
