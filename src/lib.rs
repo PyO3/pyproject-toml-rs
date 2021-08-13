@@ -9,6 +9,8 @@ pub struct BuildSystem {
     pub requires: Vec<String>,
     /// A string naming a Python object that will be used to perform the build
     pub build_backend: Option<String>,
+    /// Specify that their backend code is hosted in-tree, this key contains a list of directories
+    pub backend_path: Option<Vec<String>>,
 }
 
 /// A pyproject.toml as specified in PEP 517
