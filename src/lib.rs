@@ -8,7 +8,7 @@ pub struct BuildSystem {
     /// PEP 508 dependencies required to execute the build system
     pub requires: Vec<String>,
     /// A string naming a Python object that will be used to perform the build
-    pub build_backend: String,
+    pub build_backend: Option<String>,
 }
 
 /// A pyproject.toml as specified in PEP 517
@@ -165,7 +165,7 @@ tomatoes = "spam:main_tomatoes""#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let build_system = &project_toml.build_system;
         assert_eq!(build_system.requires, &["maturin"]);
-        assert_eq!(build_system.build_backend, "maturin");
+        assert_eq!(build_system.build_backend.as_deref(), Some("maturin"));
 
         let project = project_toml.project.as_ref().unwrap();
         assert_eq!(project.name, "spam");
