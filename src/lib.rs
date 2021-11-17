@@ -40,9 +40,9 @@ pub struct Project {
     /// License
     pub license: Option<License>,
     /// The people or organizations considered to be the "authors" of the project
-    pub authors: Option<Vec<People>>,
+    pub authors: Option<Vec<Contact>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation
-    pub maintainers: Option<Vec<People>>,
+    pub maintainers: Option<Vec<Contact>>,
     /// The keywords for the project
     pub keywords: Option<Vec<String>>,
     /// Trove classifiers which apply to the project
@@ -93,7 +93,8 @@ pub struct License {
 
 /// Project people contact information
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct People {
+#[serde(expecting = "a table with 'name' and 'email' fields")]
+pub struct Contact {
     /// A valid email name
     pub name: Option<String>,
     /// A valid email address
