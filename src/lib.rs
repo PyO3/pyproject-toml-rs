@@ -84,6 +84,7 @@ pub enum ReadMe {
 
 /// License
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(expecting = "a table with 'file' or 'text' key")]
 pub struct License {
     /// A relative file path to the file which contains the license for the project
     pub file: Option<String>,
@@ -93,7 +94,7 @@ pub struct License {
 
 /// Project people contact information
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(expecting = "a table with 'name' and 'email' fields")]
+#[serde(expecting = "a table with 'name' and 'email' keys")]
 pub struct Contact {
     /// A valid email name
     pub name: Option<String>,
