@@ -98,25 +98,24 @@ pub struct License {
 
 /// License-Files
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct LicenseFiles {
+pub enum LicenseFiles {
     /// List of file paths describing `License-File` output
-    pub paths: Option<Vec<String>>,
+    #[serde(rename = "paths")]
+    Paths(Option<Vec<String>>),
     /// List of glob patterns describing `License-File` output
-    pub globs: Option<Vec<String>>,
+    #[serde(rename = "globs")]
+    Globs(Option<Vec<String>>),
 }
 
 /// Default value specified by PEP 639
 impl Default for LicenseFiles {
     fn default() -> Self {
-        LicenseFiles {
-            paths: None,
-            globs: Some(vec![
-                "LICEN[CS]E*".to_owned(),
-                "COPYING*".to_owned(),
-                "NOTICE*".to_owned(),
-                "AUTHORS*".to_owned(),
-            ]),
-        }
+        LicenseFiles::Globs(Some(vec![
+            "LICEN[CS]E*".to_owned(),
+            "COPYING*".to_owned(),
+            "NOTICE*".to_owned(),
+            "AUTHORS*".to_owned(),
+        ]))
     }
 }
 
@@ -154,17 +153,6 @@ description = "Lovely Spam! Wonderful Spam!"
 readme = "README.rst"
 requires-python = ">=3.8"
 license = {file = "LICENSE.txt"}
-license-expression = "MIT OR BSD-3-Clause"
-license-files.paths = [
-    "LICENSE",
-    "NOTICE",
-    "AUTHORS"
-]
-license-files.globs = [
-    "LICEN[CS]E*",
-    "NOTICE*",
-    "AUTHORS*"
-]
 keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 authors = [
   {email = "hi@pradyunsg.me"},
@@ -227,37 +215,6 @@ tomatoes = "spam:main_tomatoes""#;
             Some("LICENSE.txt")
         );
         assert_eq!(
-            project.license_expression.as_deref(),
-            Some("MIT OR BSD-3-Clause")
-        );
-        assert_eq!(
-            project.license_files,
-            Some(LicenseFiles {
-                paths: Some(vec![
-                    "LICENSE".to_owned(),
-                    "NOTICE".to_owned(),
-                    "AUTHORS".to_owned()
-                ]),
-                globs: Some(vec![
-                    "LICEN[CS]E*".to_owned(),
-                    "NOTICE*".to_owned(),
-                    "AUTHORS*".to_owned()
-                ]),
-            })
-        );
-        assert_eq!(
-            LicenseFiles::default(),
-            LicenseFiles {
-                paths: None,
-                globs: Some(vec![
-                    "LICEN[CS]E*".to_owned(),
-                    "COPYING*".to_owned(),
-                    "NOTICE*".to_owned(),
-                    "AUTHORS*".to_owned(),
-                ]),
-            }
-        );
-        assert_eq!(
             project.keywords.as_ref().unwrap(),
             &["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
         );
@@ -268,6 +225,101 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.gui_scripts.as_ref().unwrap()["spam-gui"],
             "spam:main_gui"
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_expression() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-expression = "MIT OR BSD-3-Clause"
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+        assert_eq!(
+            project.license_expression.as_deref(),
+            Some("MIT OR BSD-3-Clause")
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_paths() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-files.paths = [
+    "LICENSE",
+    "NOTICE",
+    "AUTHORS"
+]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files,
+            Some(LicenseFiles::Paths(Some(vec![
+                "LICENSE".to_owned(),
+                "NOTICE".to_owned(),
+                "AUTHORS".to_owned()
+            ])))
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_globs() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-files.globs = [
+    "LICEN[CS]E*",
+    "NOTICE*",
+    "AUTHORS*"
+]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files,
+            Some(LicenseFiles::Globs(Some(vec![
+                "LICEN[CS]E*".to_owned(),
+                "NOTICE*".to_owned(),
+                "AUTHORS*".to_owned(),
+            ])))
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_default_license_files() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files.clone().unwrap_or_default(),
+            LicenseFiles::Globs(Some(vec![
+                "LICEN[CS]E*".to_owned(),
+                "COPYING*".to_owned(),
+                "NOTICE*".to_owned(),
+                "AUTHORS*".to_owned(),
+            ]))
         );
     }
 }
