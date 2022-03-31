@@ -39,6 +39,10 @@ pub struct Project {
     pub requires_python: Option<String>,
     /// License
     pub license: Option<License>,
+    /// License Expression (PEP 639) - https://peps.python.org/pep-0639/#add-license-expression-key
+    pub license_expression: Option<String>,
+    /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
+    pub license_files: Option<LicenseFiles>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation
@@ -92,6 +96,30 @@ pub struct License {
     pub text: Option<String>,
 }
 
+/// License-Files
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LicenseFiles {
+    /// List of file paths describing `License-File` output
+    pub paths: Option<Vec<String>>,
+    /// List of glob patterns describing `License-File` output
+    pub globs: Option<Vec<String>>,
+}
+
+/// Default value specified by PEP 639
+impl Default for LicenseFiles {
+    fn default() -> Self {
+        LicenseFiles {
+            paths: None,
+            globs: Some(vec![
+                "LICEN[CS]E*".to_owned(),
+                "COPYING*".to_owned(),
+                "NOTICE*".to_owned(),
+                "AUTHORS*".to_owned(),
+            ]),
+        }
+    }
+}
+
 /// Project people contact information
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(expecting = "a table with 'name' and 'email' keys")]
@@ -111,7 +139,7 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use super::{PyProjectToml, ReadMe};
+    use super::{LicenseFiles, PyProjectToml, ReadMe};
 
     #[test]
     fn test_parse_pyproject_toml() {
@@ -126,6 +154,17 @@ description = "Lovely Spam! Wonderful Spam!"
 readme = "README.rst"
 requires-python = ">=3.8"
 license = {file = "LICENSE.txt"}
+license-expression = "MIT OR BSD-3-Clause"
+license-files.paths = [
+    "LICENSE",
+    "NOTICE",
+    "AUTHORS"
+]
+license-files.globs = [
+    "LICEN[CS]E*",
+    "NOTICE*",
+    "AUTHORS*"
+]
 keywords = ["egg", "bacon", "sausage", "tomatoes", "Lobster Thermidor"]
 authors = [
   {email = "hi@pradyunsg.me"},
@@ -186,6 +225,37 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.license.as_ref().unwrap().file.as_deref(),
             Some("LICENSE.txt")
+        );
+        assert_eq!(
+            project.license_expression.as_deref(),
+            Some("MIT OR BSD-3-Clause")
+        );
+        assert_eq!(
+            project.license_files,
+            Some(LicenseFiles {
+                paths: Some(vec![
+                    "LICENSE".to_owned(),
+                    "NOTICE".to_owned(),
+                    "AUTHORS".to_owned()
+                ]),
+                globs: Some(vec![
+                    "LICEN[CS]E*".to_owned(),
+                    "NOTICE*".to_owned(),
+                    "AUTHORS*".to_owned()
+                ]),
+            })
+        );
+        assert_eq!(
+            LicenseFiles::default(),
+            LicenseFiles {
+                paths: None,
+                globs: Some(vec![
+                    "LICEN[CS]E*".to_owned(),
+                    "COPYING*".to_owned(),
+                    "NOTICE*".to_owned(),
+                    "AUTHORS*".to_owned(),
+                ]),
+            }
         );
         assert_eq!(
             project.keywords.as_ref().unwrap(),
