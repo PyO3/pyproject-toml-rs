@@ -39,6 +39,10 @@ pub struct Project {
     pub requires_python: Option<String>,
     /// License
     pub license: Option<License>,
+    /// License Expression (PEP 639) - https://peps.python.org/pep-0639/#add-license-expression-key
+    pub license_expression: Option<String>,
+    /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
+    pub license_files: Option<LicenseFiles>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation
@@ -92,6 +96,29 @@ pub struct License {
     pub text: Option<String>,
 }
 
+/// License-Files
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum LicenseFiles {
+    /// List of file paths describing `License-File` output
+    #[serde(rename = "paths")]
+    Paths(Option<Vec<String>>),
+    /// List of glob patterns describing `License-File` output
+    #[serde(rename = "globs")]
+    Globs(Option<Vec<String>>),
+}
+
+/// Default value specified by PEP 639
+impl Default for LicenseFiles {
+    fn default() -> Self {
+        LicenseFiles::Globs(Some(vec![
+            "LICEN[CS]E*".to_owned(),
+            "COPYING*".to_owned(),
+            "NOTICE*".to_owned(),
+            "AUTHORS*".to_owned(),
+        ]))
+    }
+}
+
 /// Project people contact information
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(expecting = "a table with 'name' and 'email' keys")]
@@ -104,14 +131,14 @@ pub struct Contact {
 
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
-    pub fn new(content: &str) -> Result<Self, toml::de::Error> {
-        toml::from_str(content)
+    pub fn new(content: &str) -> Result<Self, toml_edit::de::Error> {
+        toml_edit::de::from_str(content)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{PyProjectToml, ReadMe};
+    use super::{LicenseFiles, PyProjectToml, ReadMe};
 
     #[test]
     fn test_parse_pyproject_toml() {
@@ -198,6 +225,101 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.gui_scripts.as_ref().unwrap()["spam-gui"],
             "spam:main_gui"
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_expression() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-expression = "MIT OR BSD-3-Clause"
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+        assert_eq!(
+            project.license_expression.as_deref(),
+            Some("MIT OR BSD-3-Clause")
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_paths() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-files.paths = [
+    "LICENSE",
+    "NOTICE",
+    "AUTHORS"
+]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files,
+            Some(LicenseFiles::Paths(Some(vec![
+                "LICENSE".to_owned(),
+                "NOTICE".to_owned(),
+                "AUTHORS".to_owned()
+            ])))
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_license_globs() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+license-files.globs = [
+    "LICEN[CS]E*",
+    "NOTICE*",
+    "AUTHORS*"
+]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files,
+            Some(LicenseFiles::Globs(Some(vec![
+                "LICEN[CS]E*".to_owned(),
+                "NOTICE*".to_owned(),
+                "AUTHORS*".to_owned(),
+            ])))
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_default_license_files() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spam"
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.license_files.clone().unwrap_or_default(),
+            LicenseFiles::Globs(Some(vec![
+                "LICEN[CS]E*".to_owned(),
+                "COPYING*".to_owned(),
+                "NOTICE*".to_owned(),
+                "AUTHORS*".to_owned(),
+            ]))
         );
     }
 }
