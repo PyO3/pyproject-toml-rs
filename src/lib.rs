@@ -69,7 +69,7 @@ pub struct Project {
 }
 
 /// The full description of the project (i.e. the README).
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 #[serde(untagged)]
 pub enum ReadMe {
@@ -97,7 +97,7 @@ pub struct License {
 }
 
 /// License-Files
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum LicenseFiles {
     /// List of file paths describing `License-File` output
     #[serde(rename = "paths")]
