@@ -131,8 +131,8 @@ pub struct Contact {
 
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
-    pub fn new(content: &str) -> Result<Self, toml_edit::de::Error> {
-        toml_edit::de::from_str(content)
+    pub fn new(content: &str) -> Result<Self, toml::de::Error> {
+        toml::de::from_str(content)
     }
 }
 
