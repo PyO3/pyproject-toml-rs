@@ -13,4 +13,4 @@ repository = "https://github.com/PyO3/pyproject-toml-rs.git"
 
 [dependencies]
 serde = { version = "1.0.125", features = ["derive"] }
-toml = "0.6.0"
+toml = { version = "0.7.0", default-features = false, features = ["parse"] }
