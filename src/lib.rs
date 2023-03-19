@@ -1,5 +1,5 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -52,17 +52,17 @@ pub struct Project {
     /// Trove classifiers which apply to the project
     pub classifiers: Option<Vec<String>>,
     /// A table of URLs where the key is the URL label and the value is the URL itself
-    pub urls: Option<HashMap<String, String>>,
+    pub urls: Option<IndexMap<String, String>>,
     /// Entry points
-    pub entry_points: Option<HashMap<String, HashMap<String, String>>>,
+    pub entry_points: Option<IndexMap<String, IndexMap<String, String>>>,
     /// Corresponds to the console_scripts group in the core metadata
-    pub scripts: Option<HashMap<String, String>>,
+    pub scripts: Option<IndexMap<String, String>>,
     /// Corresponds to the gui_scripts group in the core metadata
-    pub gui_scripts: Option<HashMap<String, String>>,
+    pub gui_scripts: Option<IndexMap<String, String>>,
     /// Project dependencies
     pub dependencies: Option<Vec<String>>,
     /// Optional dependencies
-    pub optional_dependencies: Option<HashMap<String, Vec<String>>>,
+    pub optional_dependencies: Option<IndexMap<String, Vec<String>>>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
     pub dynamic: Option<Vec<String>>,
