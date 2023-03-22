@@ -1,4 +1,6 @@
 use indexmap::IndexMap;
+use pep440_rs::{Version, VersionSpecifiers};
+use pep508_rs::Requirement;
 use serde::{Deserialize, Serialize};
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
@@ -6,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub struct BuildSystem {
     /// PEP 508 dependencies required to execute the build system
-    pub requires: Vec<String>,
+    pub requires: Vec<Requirement>,
     /// A string naming a Python object that will be used to perform the build
     pub build_backend: Option<String>,
     /// Specify that their backend code is hosted in-tree, this key contains a list of directories
@@ -30,13 +32,13 @@ pub struct Project {
     /// The name of the project
     pub name: String,
     /// The version of the project as supported by PEP 440
-    pub version: Option<String>,
+    pub version: Option<Version>,
     /// The summary description of the project
     pub description: Option<String>,
     /// The full description of the project (i.e. the README)
     pub readme: Option<ReadMe>,
     /// The Python version requirements of the project
-    pub requires_python: Option<String>,
+    pub requires_python: Option<VersionSpecifiers>,
     /// License
     pub license: Option<License>,
     /// License Expression (PEP 639) - https://peps.python.org/pep-0639/#add-license-expression-key
@@ -60,9 +62,9 @@ pub struct Project {
     /// Corresponds to the gui_scripts group in the core metadata
     pub gui_scripts: Option<IndexMap<String, String>>,
     /// Project dependencies
-    pub dependencies: Option<Vec<String>>,
+    pub dependencies: Option<Vec<Requirement>>,
     /// Optional dependencies
-    pub optional_dependencies: Option<IndexMap<String, Vec<String>>>,
+    pub optional_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
     pub dynamic: Option<Vec<String>>,
@@ -139,6 +141,9 @@ impl PyProjectToml {
 #[cfg(test)]
 mod tests {
     use super::{LicenseFiles, PyProjectToml, ReadMe};
+    use pep440_rs::{Version, VersionSpecifiers};
+    use pep508_rs::Requirement;
+    use std::str::FromStr;
 
     #[test]
     fn test_parse_pyproject_toml() {
@@ -195,12 +200,18 @@ spam-gui = "spam:main_gui"
 tomatoes = "spam:main_tomatoes""#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let build_system = &project_toml.build_system;
-        assert_eq!(build_system.requires, &["maturin"]);
+        assert_eq!(
+            build_system.requires,
+            &[Requirement::from_str("maturin").unwrap()]
+        );
         assert_eq!(build_system.build_backend.as_deref(), Some("maturin"));
 
         let project = project_toml.project.as_ref().unwrap();
         assert_eq!(project.name, "spam");
-        assert_eq!(project.version.as_deref(), Some("2020.0.0"));
+        assert_eq!(
+            project.version,
+            Some(Version::from_str("2020.0.0").unwrap())
+        );
         assert_eq!(
             project.description.as_deref(),
             Some("Lovely Spam! Wonderful Spam!")
@@ -209,7 +220,10 @@ tomatoes = "spam:main_tomatoes""#;
             project.readme,
             Some(ReadMe::RelativePath("README.rst".to_string()))
         );
-        assert_eq!(project.requires_python.as_deref(), Some(">=3.8"));
+        assert_eq!(
+            project.requires_python,
+            Some(VersionSpecifiers::from_str(">=3.8").unwrap())
+        );
         assert_eq!(
             project.license.as_ref().unwrap().file.as_deref(),
             Some("LICENSE.txt")

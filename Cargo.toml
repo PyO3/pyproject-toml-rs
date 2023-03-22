@@ -15,3 +15,5 @@ repository = "https://github.com/PyO3/pyproject-toml-rs.git"
 indexmap = { version = "1.9.2", features = ["serde-1"] }
 serde = { version = "1.0.125", features = ["derive"] }
 toml = { version = "0.7.0", default-features = false, features = ["parse"] }
+pep508_rs = { git = "https://github.com/konstin/pep508_rs", rev = "349ce4867c467de92db06983e5cd885c89339cfe", features = ["serde"] }
+pep440_rs = { git = "https://github.com/konstin/pep440-rs", rev = "0e9d26526234a6615b1316d6ef7ba79ed6beac09", features = ["serde"] }
