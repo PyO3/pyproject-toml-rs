@@ -71,8 +71,8 @@ pub struct Project {
 }
 
 impl Project {
-    /// Like `#[derive(Default)]`, but `name` is mandatory in PEP 621
-    pub fn default_with_name(name: String) -> Self {
+    /// Initializes the only field mandatory in PEP 621 (`name`) and leaves everything else empty
+    pub fn new(name: String) -> Self {
         Self {
             name,
             version: None,
