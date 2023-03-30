@@ -70,6 +70,33 @@ pub struct Project {
     pub dynamic: Option<Vec<String>>,
 }
 
+impl Project {
+    /// Like `#[derive(Default)]`, but `name` is mandatory in PEP 621
+    pub fn default_with_name(name: String) -> Self {
+        Self {
+            name,
+            version: None,
+            description: None,
+            readme: None,
+            requires_python: None,
+            license: None,
+            license_expression: None,
+            license_files: None,
+            authors: None,
+            maintainers: None,
+            keywords: None,
+            classifiers: None,
+            urls: None,
+            entry_points: None,
+            scripts: None,
+            gui_scripts: None,
+            dependencies: None,
+            optional_dependencies: None,
+            dynamic: None,
+        }
+    }
+}
+
 /// The full description of the project (i.e. the README).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
