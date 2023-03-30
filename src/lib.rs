@@ -4,7 +4,7 @@ use pep508_rs::Requirement;
 use serde::{Deserialize, Serialize};
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildSystem {
     /// PEP 508 dependencies required to execute the build system
@@ -16,7 +16,7 @@ pub struct BuildSystem {
 }
 
 /// A pyproject.toml as specified in PEP 517
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
     /// Build-related data
@@ -26,7 +26,7 @@ pub struct PyProjectToml {
 }
 
 /// PEP 621 project metadata
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Project {
     /// The name of the project
@@ -89,7 +89,7 @@ pub enum ReadMe {
 }
 
 /// License
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(expecting = "a table with 'file' or 'text' key")]
 pub struct License {
     /// A relative file path to the file which contains the license for the project
@@ -122,7 +122,7 @@ impl Default for LicenseFiles {
 }
 
 /// Project people contact information
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(expecting = "a table with 'name' and 'email' keys")]
 pub struct Contact {
     /// A valid email name
