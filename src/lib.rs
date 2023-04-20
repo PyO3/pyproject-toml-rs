@@ -72,6 +72,7 @@ pub enum ReadMe {
     /// Relative path to a text file containing the full description
     RelativePath(String),
     /// Detailed readme information
+    #[serde(rename_all = "kebab-case")]
     Table {
         /// A relative path to a file containing the full description
         file: Option<String>,
@@ -198,6 +199,28 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.gui_scripts.as_ref().unwrap()["spam-gui"],
             "spam:main_gui"
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_readme_content_type() {
+        let source = r#"[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+[project]
+name = "spam"
+readme = {text = "ReadMe!", content-type = "text/plain"}
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let project = project_toml.project.as_ref().unwrap();
+
+        assert_eq!(
+            project.readme,
+            Some(ReadMe::Table {
+                file: None,
+                text: Some("ReadMe!".to_string()),
+                content_type: Some("text/plain".to_string())
+            })
         );
     }
 }
