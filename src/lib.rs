@@ -41,8 +41,6 @@ pub struct Project {
     pub requires_python: Option<VersionSpecifiers>,
     /// License
     pub license: Option<License>,
-    /// License Expression (PEP 639) - https://peps.python.org/pep-0639/#add-license-expression-key
-    pub license_expression: Option<String>,
     /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
     pub license_files: Option<LicenseFiles>,
     /// The people or organizations considered to be the "authors" of the project
@@ -80,7 +78,6 @@ impl Project {
             readme: None,
             requires_python: None,
             license: None,
-            license_expression: None,
             license_files: None,
             authors: None,
             maintainers: None,
@@ -118,12 +115,17 @@ pub enum ReadMe {
 
 /// License
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(expecting = "a table with 'file' or 'text' key")]
-pub struct License {
-    /// A relative file path to the file which contains the license for the project
-    pub file: Option<String>,
-    /// The license content of the project
-    pub text: Option<String>,
+#[serde(untagged)]
+pub enum License {
+    /// A SPDX license expression, according to PEP 639
+    String(String),
+    /// A PEP 621 license table. Note that accepting PEP 639 will deprecate this table
+    Table {
+        /// A relative file path to the file which contains the license for the project
+        file: Option<String>,
+        /// The license content of the project
+        text: Option<String>,
+    },
 }
 
 /// License-Files
@@ -168,7 +170,7 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use super::{LicenseFiles, PyProjectToml, ReadMe};
+    use super::{License, LicenseFiles, PyProjectToml, ReadMe};
     use pep440_rs::{Version, VersionSpecifiers};
     use pep508_rs::Requirement;
     use std::str::FromStr;
@@ -253,8 +255,11 @@ tomatoes = "spam:main_tomatoes""#;
             Some(VersionSpecifiers::from_str(">=3.8").unwrap())
         );
         assert_eq!(
-            project.license.as_ref().unwrap().file.as_deref(),
-            Some("LICENSE.txt")
+            project.license,
+            Some(License::Table {
+                file: Some("LICENSE.txt".to_owned()),
+                text: None
+            })
         );
         assert_eq!(
             project.keywords.as_ref().unwrap(),
@@ -278,16 +283,17 @@ build-backend = "maturin"
 
 [project]
 name = "spam"
-license-expression = "MIT OR BSD-3-Clause"
+license = "MIT OR BSD-3-Clause"
 "#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let project = project_toml.project.as_ref().unwrap();
         assert_eq!(
-            project.license_expression.as_deref(),
-            Some("MIT OR BSD-3-Clause")
+            project.license,
+            Some(License::String("MIT OR BSD-3-Clause".to_owned()))
         );
     }
 
+    /// https://peps.python.org/pep-0639/#advanced-example
     #[test]
     fn test_parse_pyproject_toml_license_paths() {
         let source = r#"[build-system]
@@ -296,25 +302,35 @@ build-backend = "maturin"
 
 [project]
 name = "spam"
+license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
 license-files.paths = [
     "LICENSE",
-    "NOTICE",
-    "AUTHORS"
+    "setuptools/_vendor/LICENSE",
+    "setuptools/_vendor/LICENSE.APACHE",
+    "setuptools/_vendor/LICENSE.BSD",
 ]
 "#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let project = project_toml.project.as_ref().unwrap();
 
         assert_eq!(
+            project.license,
+            Some(License::String(
+                "MIT AND (Apache-2.0 OR BSD-2-Clause)".to_owned()
+            ))
+        );
+        assert_eq!(
             project.license_files,
             Some(LicenseFiles::Paths(Some(vec![
                 "LICENSE".to_owned(),
-                "NOTICE".to_owned(),
-                "AUTHORS".to_owned()
+                "setuptools/_vendor/LICENSE".to_owned(),
+                "setuptools/_vendor/LICENSE.APACHE".to_owned(),
+                "setuptools/_vendor/LICENSE.BSD".to_owned()
             ])))
         );
     }
 
+    // https://peps.python.org/pep-0639/#advanced-example
     #[test]
     fn test_parse_pyproject_toml_license_globs() {
         let source = r#"[build-system]
@@ -323,21 +339,26 @@ build-backend = "maturin"
 
 [project]
 name = "spam"
+license = "MIT AND (Apache-2.0 OR BSD-2-Clause)"
 license-files.globs = [
-    "LICEN[CS]E*",
-    "NOTICE*",
-    "AUTHORS*"
+    "LICENSE*",
+    "setuptools/_vendor/LICENSE*",
 ]
 "#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let project = project_toml.project.as_ref().unwrap();
 
         assert_eq!(
+            project.license,
+            Some(License::String(
+                "MIT AND (Apache-2.0 OR BSD-2-Clause)".to_owned()
+            ))
+        );
+        assert_eq!(
             project.license_files,
             Some(LicenseFiles::Globs(Some(vec![
-                "LICEN[CS]E*".to_owned(),
-                "NOTICE*".to_owned(),
-                "AUTHORS*".to_owned(),
+                "LICENSE*".to_owned(),
+                "setuptools/_vendor/LICENSE*".to_owned(),
             ])))
         );
     }
