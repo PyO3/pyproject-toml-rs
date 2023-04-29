@@ -1,10 +1,10 @@
 [package]
 name = "pyproject-toml"
-version = "0.5.2"
+version = "0.6.0"
 description = "pyproject.toml parser in Rust"
 edition = "2021"
 license = "MIT"
-keywords = ["pyproject", "pep517", "pep518", "pep621"]
+keywords = ["pyproject", "pep517", "pep518", "pep621", "pep639"]
 readme = "README.md"
 repository = "https://github.com/PyO3/pyproject-toml-rs.git"
 
