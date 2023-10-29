@@ -1,6 +1,6 @@
 [package]
 name = "pyproject-toml"
-version = "0.7.0"
+version = "0.8.0"
 description = "pyproject.toml parser in Rust"
 edition = "2021"
 license = "MIT"

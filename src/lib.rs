@@ -20,7 +20,7 @@ pub struct BuildSystem {
 #[serde(rename_all = "kebab-case")]
 pub struct PyProjectToml {
     /// Build-related data
-    pub build_system: BuildSystem,
+    pub build_system: Option<BuildSystem>,
     /// Project metadata
     pub project: Option<Project>,
 }
@@ -229,7 +229,7 @@ spam-gui = "spam:main_gui"
 [project.entry-points."spam.magical"]
 tomatoes = "spam:main_tomatoes""#;
         let project_toml = PyProjectToml::new(source).unwrap();
-        let build_system = &project_toml.build_system;
+        let build_system = &project_toml.build_system.unwrap();
         assert_eq!(
             build_system.requires,
             &[Requirement::from_str("maturin").unwrap()]
