@@ -14,6 +14,6 @@ rust-version = "1.64"
 [dependencies]
 indexmap = { version = "2.0.0", features = ["serde"] }
 serde = { version = "1.0.125", features = ["derive"] }
-toml = { version = "0.7.0", default-features = false, features = ["parse"] }
+toml = { version = "0.8.0", default-features = false, features = ["parse"] }
 pep508_rs = { version = "0.2.1", features = ["serde"] }
 pep440_rs = { version = "0.3.6", features = ["serde"] }
