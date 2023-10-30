@@ -12,7 +12,7 @@ Add it to your ``Cargo.toml``:
 
 ```toml
 [dependencies]
-pyproject-toml = "0.7"
+pyproject-toml = "0.8"
 ```
 
 then you are good to go. If you are using Rust 2015 you have to add ``extern crate pyproject_toml`` to your crate root as well.
