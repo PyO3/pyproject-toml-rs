@@ -1,6 +1,6 @@
 [package]
 name = "pyproject-toml"
-version = "0.9.0"
+version = "0.10.0"
 description = "pyproject.toml parser in Rust"
 edition = "2021"
 license = "MIT"
@@ -15,5 +15,8 @@ rust-version = "1.64"
 indexmap = { version = "2.0.0", features = ["serde"] }
 serde = { version = "1.0.125", features = ["derive"] }
 toml = { version = "0.8.0", default-features = false, features = ["parse"] }
-pep508_rs = { version = "0.3.0", features = ["serde"] }
-pep440_rs = { version = "0.4.0", features = ["serde"] }
+pep508_rs = { version = "0.4.2", features = ["serde"] }
+pep440_rs = { version = "0.5.0", features = ["serde"] }
+
+[features]
+tracing = ["pep440_rs/tracing", "pep508_rs/tracing"]
