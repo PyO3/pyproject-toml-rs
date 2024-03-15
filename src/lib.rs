@@ -170,6 +170,27 @@ impl<T: DeserializeOwned> PyProjectToml<T> {
     pub fn new(content: &str) -> Result<Self, toml::de::Error> {
         toml::de::from_str(content)
     }
+
+    pub fn try_from(value: PyProjectToml<Table>) -> Result<Self, toml::de::Error> {
+        Ok(Self {
+            build_system: value.build_system,
+            project: value.project,
+            tool: value.tool.map(Table::try_into).transpose()?,
+        })
+    }
+}
+
+impl PyProjectToml {
+    pub fn try_into<'de, T>(self) -> Result<PyProjectToml<T>, toml::de::Error>
+    where
+        T: Deserialize<'de>,
+    {
+        Ok(PyProjectToml {
+            build_system: self.build_system,
+            project: self.project,
+            tool: self.tool.map(Table::try_into).transpose()?,
+        })
+    }
 }
 
 #[cfg(test)]
