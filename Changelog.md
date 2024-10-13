@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+
+* Support dependency groups (PEP 735)
+
 ## 0.11.0
 
 * Update pep440_rs to 0.6.0

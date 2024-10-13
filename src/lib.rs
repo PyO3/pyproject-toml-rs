@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::Requirement;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -43,7 +44,7 @@ pub struct Project {
     pub requires_python: Option<VersionSpecifiers>,
     /// License
     pub license: Option<License>,
-    /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
+    /// License Files (PEP 639) - <https://peps.python.org/pep-0639/#add-license-files-key>
     pub license_files: Option<LicenseFiles>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
@@ -164,16 +165,25 @@ pub struct Contact {
 }
 
 /// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
-type DependencyGroups = IndexMap<String, Vec<DependencyGroupSpecifier>>;
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct DependencyGroups(pub IndexMap<String, Vec<DependencyGroupSpecifier>>);
+
+impl Deref for DependencyGroups {
+    type Target = IndexMap<String, Vec<DependencyGroupSpecifier>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// A specifier item in a Dependency Group
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-#[serde(untagged)]
+#[serde(rename_all = "kebab-case", untagged)]
 pub enum DependencyGroupSpecifier {
     /// PEP 508 requirement string
     String(Requirement),
-    /// DependencyGroupInclude
+    /// Include another dependency group
     #[serde(rename_all = "kebab-case")]
     Table {
         /// The name of the group to include
