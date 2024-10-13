@@ -23,6 +23,8 @@ pub struct PyProjectToml {
     pub build_system: Option<BuildSystem>,
     /// Project metadata
     pub project: Option<Project>,
+    /// Dependency groups table
+    pub dependency_groups: Option<DependencyGroups>,
 }
 
 /// PEP 621 project metadata
@@ -161,6 +163,24 @@ pub struct Contact {
     pub email: Option<String>,
 }
 
+/// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
+type DependencyGroups = IndexMap<String, Vec<DependencyGroupSpecifier>>;
+
+/// A specifier item in a Dependency Group
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[serde(untagged)]
+pub enum DependencyGroupSpecifier {
+    /// PEP 508 requirement string
+    String(Requirement),
+    /// DependencyGroupInclude
+    #[serde(rename_all = "kebab-case")]
+    Table {
+        /// The name of the group to include
+        include_group: Option<String>,
+    },
+}
+
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
     pub fn new(content: &str) -> Result<Self, toml::de::Error> {
@@ -170,7 +190,7 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use super::{License, LicenseFiles, PyProjectToml, ReadMe};
+    use super::{DependencyGroupSpecifier, License, LicenseFiles, PyProjectToml, ReadMe};
     use pep440_rs::{Version, VersionSpecifiers};
     use pep508_rs::Requirement;
     use std::str::FromStr;
@@ -406,6 +426,41 @@ readme = {text = "ReadMe!", content-type = "text/plain"}
                 text: Some("ReadMe!".to_string()),
                 content_type: Some("text/plain".to_string())
             })
+        );
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_dependency_groups() {
+        let source = r#"[dependency-groups]
+alpha = ["beta", "gamma", "delta"]
+epsilon = ["eta<2.0", "theta==2024.09.01"]
+iota = [{include-group = "alpha"}]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let dependency_groups = project_toml.dependency_groups.as_ref().unwrap();
+
+        assert_eq!(
+            dependency_groups["alpha"],
+            vec![
+                DependencyGroupSpecifier::String(Requirement::from_str("beta").unwrap()),
+                DependencyGroupSpecifier::String(Requirement::from_str("gamma").unwrap()),
+                DependencyGroupSpecifier::String(Requirement::from_str("delta").unwrap(),)
+            ]
+        );
+        assert_eq!(
+            dependency_groups["epsilon"],
+            vec![
+                DependencyGroupSpecifier::String(Requirement::from_str("eta<2.0").unwrap()),
+                DependencyGroupSpecifier::String(
+                    Requirement::from_str("theta==2024.09.01").unwrap()
+                )
+            ]
+        );
+        assert_eq!(
+            dependency_groups["iota"],
+            vec![DependencyGroupSpecifier::Table {
+                include_group: Some("alpha".to_string())
+            }]
         );
     }
 }
