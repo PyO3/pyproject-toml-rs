@@ -41,7 +41,7 @@ pub struct Project {
     pub requires_python: Option<VersionSpecifiers>,
     /// License
     pub license: Option<License>,
-    /// License Files (PEP 639) - https://peps.python.org/pep-0639/#add-license-files-key
+    /// License Files (PEP 639) - <https://peps.python.org/pep-0639/#add-license-files-key>
     pub license_files: Option<LicenseFiles>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
