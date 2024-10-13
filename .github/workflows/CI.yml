@@ -7,13 +7,26 @@ on:
 name: CI
 
 jobs:
-  check:
-    name: Check
+  lint-rust:
+    name: Lint Rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check
+        with:
+          components: clippy
+      - name: Clippy
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo clippy --workspace
+      - name: Clippy (all features)
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo clippy --workspace --all-features
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps --document-private-items
 
   test:
     name: Test Suite
