@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.2
+
+* Make `Contact` definition strict
+
+## 0.13.1
+
+* Fix `Contact` definition
+
 ## 0.13.0
 
 * Update to the provisional PEP 639. This is technically a breaking change, but only for fields previously in draft

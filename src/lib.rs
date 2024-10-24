@@ -162,14 +162,19 @@ pub enum License {
 /// The entry is derived from the email format of `John Doe <john.doe@example.net>`. You need to
 /// provide at least name or email.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(untagged, expecting = "a table with 'name' and/or 'email' keys")]
+// deny_unknown_fields prevents using the name field when the email is not a string.
+#[serde(
+    untagged,
+    deny_unknown_fields,
+    expecting = "a table with 'name' and/or 'email' keys"
+)]
 pub enum Contact {
+    /// TODO(konsti): RFC 822 validation.
+    NameEmail { name: String, email: String },
     /// TODO(konsti): RFC 822 validation.
     Name { name: String },
     /// TODO(konsti): RFC 822 validation.
     Email { email: String },
-    /// TODO(konsti): RFC 822 validation.
-    NameEmail { name: String, email: String },
 }
 
 /// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
@@ -473,6 +478,29 @@ iota = [{include-group = "alpha"}]
             vec![DependencyGroupSpecifier::Table {
                 include_group: Some("alpha".to_string())
             }]
+        );
+    }
+
+    #[test]
+    fn invalid_email() {
+        let source = r#"
+[project]
+name = "hello-world"
+version = "0.1.0"
+# Ensure that the spans from toml handle utf-8 correctly
+authors = [
+    { name = "Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘", email = 1 }
+]
+"#;
+        let err = PyProjectToml::new(source).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "TOML parse error at line 6, column 11
+  |
+6 | authors = [
+  |           ^
+a table with 'name' and/or 'email' keys
+"
         );
     }
 }
