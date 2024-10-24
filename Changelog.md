@@ -1,11 +1,14 @@
 # Changelog
 
-## 0.12.0
+## 0.13.0
 
-* Support dependency groups (PEP 735)
 * Update to the provisional PEP 639. This is technically a breaking change, but only for fields previously in draft
 * Update pep440_rs to 0.7.1
 * Update pep508_rs to 0.8.0
+
+## 0.12.0
+
+* Support dependency groups (PEP 735)
 
 ## 0.11.0
 
