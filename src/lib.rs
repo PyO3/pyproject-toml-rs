@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::Requirement;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::ops::Deref;
+use std::path::PathBuf;
 
 /// The `[build-system]` section of a pyproject.toml as specified in PEP 517
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -180,6 +180,7 @@ impl Deref for DependencyGroups {
 /// A specifier item in a Dependency Group
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case", untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum DependencyGroupSpecifier {
     /// PEP 508 requirement string
     String(Requirement),
