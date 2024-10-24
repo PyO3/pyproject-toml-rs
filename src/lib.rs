@@ -154,14 +154,22 @@ pub enum License {
     },
 }
 
-/// Project people contact information
+/// A `project.authors` or `project.maintainers` entry.
+///
+/// Specified in
+/// <https://packaging.python.org/en/latest/specifications/pyproject-toml/#authors-maintainers>.
+///
+/// The entry is derived from the email format of `John Doe <john.doe@example.net>`. You need to
+/// provide at least name or email.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(expecting = "a table with 'name' and 'email' keys")]
-pub struct Contact {
-    /// A valid email name
-    pub name: Option<String>,
-    /// A valid email address
-    pub email: Option<String>,
+#[serde(untagged, expecting = "a table with 'name' and/or 'email' keys")]
+pub enum Contact {
+    /// TODO(konsti): RFC 822 validation.
+    Name { name: String },
+    /// TODO(konsti): RFC 822 validation.
+    Email { email: String },
+    /// TODO(konsti): RFC 822 validation.
+    NameEmail { name: String, email: String },
 }
 
 /// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
