@@ -3,6 +3,8 @@
 ## 0.13.3
 
 * Make `license` and `license_files` public again
+* Add accessors for email / name on Contact
+* Add a method to resolve dependency groups into concrete lists of dependencies
 
 ## 0.13.2
 
