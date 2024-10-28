@@ -4,6 +4,8 @@ mod pep639_glob;
 #[cfg(feature = "pep639-glob")]
 pub use pep639_glob::{parse_pep639_glob, Pep639GlobError};
 
+pub mod pep735_resolve;
+
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::Requirement;
@@ -219,7 +221,7 @@ pub enum DependencyGroupSpecifier {
     #[serde(rename_all = "kebab-case")]
     Table {
         /// The name of the group to include
-        include_group: Option<String>,
+        include_group: String,
     },
 }
 
@@ -494,7 +496,7 @@ iota = [{include-group = "alpha"}]
         assert_eq!(
             dependency_groups["iota"],
             vec![DependencyGroupSpecifier::Table {
-                include_group: Some("alpha".to_string())
+                include_group: "alpha".to_string()
             }]
         );
     }
