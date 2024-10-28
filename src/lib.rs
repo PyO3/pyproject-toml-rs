@@ -177,6 +177,24 @@ pub enum Contact {
     Email { email: String },
 }
 
+impl Contact {
+    /// Returns the name of the contact.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Contact::NameEmail { name, .. } | Contact::Name { name } => Some(name),
+            Contact::Email { .. } => None,
+        }
+    }
+
+    /// Returns the email of the contact.
+    pub fn email(&self) -> Option<&str> {
+        match self {
+            Contact::NameEmail { email, .. } | Contact::Email { email } => Some(email),
+            Contact::Name { .. } => None,
+        }
+    }
+}
+
 /// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
@@ -502,5 +520,30 @@ authors = [
 a table with 'name' and/or 'email' keys
 "
         );
+    }
+
+    #[test]
+    fn test_contact_accessors() {
+        let contact = super::Contact::NameEmail {
+            name: "John Doe".to_string(),
+            email: "john@example.com".to_string(),
+        };
+
+        assert_eq!(contact.name(), Some("John Doe"));
+        assert_eq!(contact.email(), Some("john@example.com"));
+
+        let contact = super::Contact::Name {
+            name: "John Doe".to_string(),
+        };
+
+        assert_eq!(contact.name(), Some("John Doe"));
+        assert_eq!(contact.email(), None);
+
+        let contact = super::Contact::Email {
+            email: "john@example.com".to_string(),
+        };
+
+        assert_eq!(contact.name(), None);
+        assert_eq!(contact.email(), Some("john@example.com"));
     }
 }
