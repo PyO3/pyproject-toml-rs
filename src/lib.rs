@@ -52,7 +52,7 @@ pub struct Project {
     /// The license under which the project is distributed
     ///
     /// Supports both the current standard and the provisional PEP 639
-    license: Option<License>,
+    pub license: Option<License>,
     /// The paths to files containing licenses and other legal notices to be distributed with the
     /// project.
     ///
@@ -61,7 +61,7 @@ pub struct Project {
     /// Note that this doesn't check the PEP 639 rules for combining `license_files` and `license`.
     ///
     /// From the provisional PEP 639
-    license_files: Option<Vec<String>>,
+    pub license_files: Option<Vec<String>>,
     /// The people or organizations considered to be the "authors" of the project
     pub authors: Option<Vec<Contact>>,
     /// Similar to "authors" in that its exact meaning is open to interpretation

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.3
+
+* Make `license` and `license_files` public again
+
 ## 0.13.2
 
 * Make `Contact` definition strict
