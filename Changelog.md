@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.4
+
+* Update pep440_rs to 0.7.2
+* Update pep508_rs to 0.9.1
+* Ensure wasm32-unknown-unknown support
+
 ## 0.13.3
 
 * Make `license` and `license_files` public again
