@@ -4,6 +4,8 @@ mod pep639_glob;
 #[cfg(feature = "pep639-glob")]
 pub use pep639_glob::{parse_pep639_glob, Pep639GlobError};
 
+pub mod has_recursion;
+pub mod optional_dependencies_resolve;
 pub mod pep735_resolve;
 
 use indexmap::IndexMap;
@@ -83,7 +85,7 @@ pub struct Project {
     /// Project dependencies
     pub dependencies: Option<Vec<Requirement>>,
     /// Optional dependencies
-    pub optional_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
+    pub optional_dependencies: Option<OptionalDependencies>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
     pub dynamic: Option<Vec<String>>,
@@ -112,6 +114,23 @@ impl Project {
             optional_dependencies: None,
             dynamic: None,
         }
+    }
+}
+
+/// The `[project.optional-dependencies]` section of pyproject.toml
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct OptionalDependencies {
+    pub inner: IndexMap<String, Vec<Requirement>>,
+    #[serde(skip)]
+    pub self_reference_name: Option<String>,
+}
+
+impl Deref for OptionalDependencies {
+    type Target = IndexMap<String, Vec<Requirement>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -228,7 +247,17 @@ pub enum DependencyGroupSpecifier {
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
     pub fn new(content: &str) -> Result<Self, toml::de::Error> {
-        toml::de::from_str(content)
+        let mut pyproject: PyProjectToml = toml::de::from_str(content)?;
+
+        // Set the project name as optional-dependencies self_reference_name
+        if let Some(project) = pyproject.project.as_mut() {
+            let name = project.name.clone();
+            if let Some(od) = project.optional_dependencies.as_mut() {
+                od.self_reference_name = Some(name);
+            }
+        }
+
+        Ok(pyproject)
     }
 }
 
@@ -336,6 +365,14 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.gui_scripts.as_ref().unwrap()["spam-gui"],
             "spam:main_gui"
+        );
+        assert_eq!(
+            project
+                .optional_dependencies
+                .as_ref()
+                .unwrap()
+                .self_reference_name,
+            Some("spam".to_string())
         );
     }
 
