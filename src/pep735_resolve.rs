@@ -1,9 +1,22 @@
-use crate::has_recursion::{HasRecursion, Item, RecursionItem};
+use indexmap::IndexMap;
+use pep508_rs::Requirement;
+
+use crate::has_recursion::{HasRecursion, Item, RecursionItem, RecursionResolutionError};
 
 use crate::{DependencyGroupSpecifier, DependencyGroups};
 
 impl HasRecursion<DependencyGroupSpecifier> for DependencyGroups {}
 
+impl DependencyGroups {
+    /// Resolve the dependency groups into lists of requirements.
+    ///
+    /// This function will recursively resolve all dependency groups, including those that
+    /// reference other groups. It will return an error if there is a cycle in the
+    /// groups or if a group references another group that does not exist.
+    pub fn resolve(&self) -> Result<IndexMap<String, Vec<Requirement>>, RecursionResolutionError> {
+        self.resolve_all(None)
+    }
+}
 impl RecursionItem for DependencyGroupSpecifier {
     fn parse(&self, _name: Option<&str>) -> Item {
         match self {

@@ -120,17 +120,13 @@ impl Project {
 /// The `[project.optional-dependencies]` section of pyproject.toml
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
-pub struct OptionalDependencies {
-    pub inner: IndexMap<String, Vec<Requirement>>,
-    #[serde(skip)]
-    pub self_reference_name: Option<String>,
-}
+pub struct OptionalDependencies(pub IndexMap<String, Vec<Requirement>>);
 
 impl Deref for OptionalDependencies {
     type Target = IndexMap<String, Vec<Requirement>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.0
     }
 }
 
@@ -247,17 +243,7 @@ pub enum DependencyGroupSpecifier {
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
     pub fn new(content: &str) -> Result<Self, toml::de::Error> {
-        let mut pyproject: PyProjectToml = toml::de::from_str(content)?;
-
-        // Set the project name as optional-dependencies self_reference_name
-        if let Some(project) = pyproject.project.as_mut() {
-            let name = project.name.clone();
-            if let Some(od) = project.optional_dependencies.as_mut() {
-                od.self_reference_name = Some(name);
-            }
-        }
-
-        Ok(pyproject)
+        toml::de::from_str(content)
     }
 }
 
@@ -365,14 +351,6 @@ tomatoes = "spam:main_tomatoes""#;
         assert_eq!(
             project.gui_scripts.as_ref().unwrap()["spam-gui"],
             "spam:main_gui"
-        );
-        assert_eq!(
-            project
-                .optional_dependencies
-                .as_ref()
-                .unwrap()
-                .self_reference_name,
-            Some("spam".to_string())
         );
     }
 
