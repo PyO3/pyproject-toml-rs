@@ -5,19 +5,10 @@ use thiserror::Error;
 
 /// A trait that resolves recursions for groups of requirements that can be mapped to `IndexMap<String, Vec<T>>`
 /// where T is a type that can be mapped to either a Requirement or a reference to other groups of requirements.
-pub trait HasRecursion<T>: Deref<Target = IndexMap<String, Vec<T>>>
+pub(crate) trait HasRecursion<T>: Deref<Target = IndexMap<String, Vec<T>>>
 where
     T: RecursionItem,
 {
-    /// Resolve the groups into lists of requirements.
-    ///
-    /// This function will recursively resolve all groups, including those that
-    /// reference other groups. It will return an error if there is a cycle in the
-    /// groups or if a group references another group that does not exist.
-    fn resolve(&self) -> Result<IndexMap<String, Vec<Requirement>>, RecursionResolutionError> {
-        self.resolve_all(None)
-    }
-
     /// Resolves the groups of requirements into flat lists of requirements.
     fn resolve_all(
         &self,
@@ -81,7 +72,7 @@ where
     }
 }
 /// A trait that defines how to parse a recursion item.
-pub trait RecursionItem {
+pub(crate) trait RecursionItem {
     /// Parse the item into a requirement or a reference to other groups.
     fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a>;
     /// The name of the group in the TOML file.
@@ -90,7 +81,7 @@ pub trait RecursionItem {
     fn table_name() -> String;
 }
 
-pub enum Item<'a> {
+pub(crate) enum Item<'a> {
     Requirement(Requirement),
     Groups(Vec<&'a str>),
 }

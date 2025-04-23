@@ -5,9 +5,22 @@ use crate::{
 use indexmap::IndexMap;
 use pep508_rs::Requirement;
 
-impl HasRecursion<Requirement> for OptionalDependencies {
-    fn resolve(&self) -> Result<IndexMap<String, Vec<Requirement>>, RecursionResolutionError> {
-        self.resolve_all(self.self_reference_name.as_deref())
+impl HasRecursion<Requirement> for OptionalDependencies {}
+
+impl OptionalDependencies {
+    /// Resolve the optional dependency groups into lists of requirements.
+    ///
+    /// This function will recursively resolve all optional dependency groups, including those that
+    /// reference other groups. It will return an error if there is a cycle in the
+    /// groups or if a group references another group that does not exist.
+    ///
+    /// `self_reference_name` is the name of the project itself, which is used to identify self-references
+    /// in the optional dependencies. If None, self-references will be treated as normal dependencies.
+    pub fn resolve(
+        &self,
+        self_reference_name: Option<&str>,
+    ) -> Result<IndexMap<String, Vec<Requirement>>, RecursionResolutionError> {
+        self.resolve_all(self_reference_name)
     }
 }
 
@@ -53,7 +66,7 @@ iota = ["spam[alpha]"]
             .unwrap();
 
         assert_eq!(
-            optional_dependencies.resolve().unwrap()["iota"],
+            optional_dependencies.resolve(Some("spam")).unwrap()["iota"],
             vec![
                 Requirement::from_str("beta").unwrap(),
                 Requirement::from_str("gamma").unwrap(),
@@ -80,7 +93,10 @@ iota = ["spam[alpha]"]
             .as_ref()
             .unwrap();
         assert_eq!(
-            optional_dependencies.resolve().unwrap_err().to_string(),
+            optional_dependencies
+                .resolve(Some("spam"))
+                .unwrap_err()
+                .to_string(),
             String::from(
                 "Detected a cycle in `project.optional-dependencies`: `alpha` -> `iota` -> `alpha`"
             )
@@ -104,7 +120,10 @@ iota = ["spam[alpha]"]
             .as_ref()
             .unwrap();
         assert_eq!(
-            optional_dependencies.resolve().unwrap_err().to_string(),
+            optional_dependencies
+                .resolve(Some("spam"))
+                .unwrap_err()
+                .to_string(),
             String::from("Failed to find optional dependency group `alpha` included by `iota`")
         )
     }
