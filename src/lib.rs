@@ -4,8 +4,6 @@ mod pep639_glob;
 #[cfg(feature = "pep639-glob")]
 pub use pep639_glob::{parse_pep639_glob, Pep639GlobError};
 
-pub mod has_recursion;
-pub mod optional_dependencies_resolve;
 pub mod pep735_resolve;
 
 use indexmap::IndexMap;
