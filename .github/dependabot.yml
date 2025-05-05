@@ -9,11 +9,15 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-  - package-ecosystem: cargo
+  - package-ecosystem: "cargo"
     directory: /
     schedule:
-      interval: weekly
+      interval: "monthly"
+    groups:
+      cargo: # Group all cargo updates into one pull request
+        patterns:
+          - "*"
     ignore:
-      - dependency-name: '*'
+      - dependency-name: "*"
         update-types: # Prevent Cargo.toml patch updates
           - version-update:semver-patch
