@@ -4,6 +4,8 @@ mod pep639_glob;
 #[cfg(feature = "pep639-glob")]
 pub use pep639_glob::{check_pep639_glob, parse_pep639_glob, Pep639GlobError};
 
+pub mod has_recursion;
+pub mod optional_dependencies_resolve;
 pub mod pep735_resolve;
 
 use indexmap::IndexMap;
@@ -83,7 +85,7 @@ pub struct Project {
     /// Project dependencies
     pub dependencies: Option<Vec<Requirement>>,
     /// Optional dependencies
-    pub optional_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
+    pub optional_dependencies: Option<OptionalDependencies>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
     pub dynamic: Option<Vec<String>>,
@@ -112,6 +114,19 @@ impl Project {
             optional_dependencies: None,
             dynamic: None,
         }
+    }
+}
+
+/// The `[project.optional-dependencies]` section of pyproject.toml
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct OptionalDependencies(pub IndexMap<String, Vec<Requirement>>);
+
+impl Deref for OptionalDependencies {
+    type Target = IndexMap<String, Vec<Requirement>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
