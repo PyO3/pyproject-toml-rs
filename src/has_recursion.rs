@@ -13,6 +13,7 @@ where
     fn resolve_all(
         &self,
         name: Option<&str>,
+        resolved_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
     ) -> Result<IndexMap<String, Vec<Requirement>>, RecursionResolutionError> {
         // Helper function to resolve a single group
         fn resolve_single<'a, T: RecursionItem>(
@@ -22,6 +23,10 @@ where
             parents: &mut Vec<&'a str>,
             name: Option<&'a str>,
         ) -> Result<(), RecursionResolutionError> {
+            // If the group has already been resolved, exit early
+            if resolved.get(group).is_some() {
+                return Ok(());
+            }
             let Some(items) = groups.get(group) else {
                 // If the group included in another group does not exist, return an error
                 let parent = parents.iter().last().expect("should have a parent");
@@ -37,10 +42,6 @@ where
                     T::table_name(),
                     Cycle(parents.iter().map(|s| s.to_string()).collect()),
                 ));
-            }
-            // If the group has already been resolved, exit early
-            if resolved.get(group).is_some() {
-                return Ok(());
             }
             // Otherwise, perform recursion, as required, on the dependency group's specifiers
             parents.push(group);
@@ -64,7 +65,7 @@ where
             Ok(())
         }
 
-        let mut resolved = IndexMap::new();
+        let mut resolved = resolved_dependencies.unwrap_or_default();
         for group in self.keys() {
             resolve_single(self, group, &mut resolved, &mut Vec::new(), name)?;
         }
