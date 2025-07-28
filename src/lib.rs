@@ -5,8 +5,7 @@ mod pep639_glob;
 pub use pep639_glob::{check_pep639_glob, parse_pep639_glob, Pep639GlobError};
 
 pub mod has_recursion;
-pub mod optional_dependencies_resolve;
-pub mod pep735_resolve;
+pub mod resolution;
 
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
