@@ -93,6 +93,10 @@ pub enum RecursionResolutionError {
     GroupNotFound(String, String, String),
     #[error("Detected a cycle in `{0}`: {1}")]
     DependencyGroupCycle(String, Cycle),
+    #[error(
+        "Group `{0}` is defined in both `project.optional-dependencies` and `dependency-groups`"
+    )]
+    NameCollision(String),
 }
 
 /// A cycle in the recursion.
