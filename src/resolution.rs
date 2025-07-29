@@ -4,35 +4,49 @@ use pep508_rs::Requirement;
 use crate::has_recursion::{HasRecursion, Item, RecursionItem, RecursionResolutionError};
 use crate::{DependencyGroupSpecifier, DependencyGroups, OptionalDependencies, PyProjectToml};
 
+type ResolvedDependencies = IndexMap<String, Vec<Requirement>>;
+
 impl PyProjectToml {
     /// Resolve the optional dependencies and dependency groups into flat lists of requirements.
     ///
     /// This function will recursively resolve all optional dependency groups and dependency groups,
-    /// including those that reference other groups. It will return an error if there is a cycle
-    /// in the groups or if a group references another group that does not exist.
+    /// including those that reference other groups. It will return an error if
+    ///  - there is a cycle in the groups,
+    ///  - a group references another group that does not exist, or
+    ///  - there is a name collision between optional dependencies and dependency groups.
     pub fn resolve(
         &self,
     ) -> Result<
-        (
-            Option<IndexMap<String, Vec<Requirement>>>,
-            Option<IndexMap<String, Vec<Requirement>>>,
-        ),
+        (Option<ResolvedDependencies>, Option<ResolvedDependencies>),
         RecursionResolutionError,
     > {
         let self_reference_name = self.project.as_ref().map(|p| p.name.as_str());
-
-        // Resolve optional dependencies first, as they may be referenced by dependency groups.
-        let resolved_optional_dependencies = self
+        let optional_dependencies = self
             .project
             .as_ref()
-            .and_then(|project| project.optional_dependencies.as_ref())
+            .and_then(|p| p.optional_dependencies.as_ref());
+
+        // Check for collisions between optional dependencies and dependency groups.
+        if let (Some(optional_dependencies), Some(dependency_groups)) =
+            (optional_dependencies, self.dependency_groups.as_ref())
+        {
+            for group in optional_dependencies.keys() {
+                if dependency_groups.contains_key(group) {
+                    return Err(RecursionResolutionError::NameCollision(group.clone()));
+                }
+            }
+        }
+
+        // Resolve optional dependencies first, as they may be referenced by dependency groups.
+        let resolved_optional_dependencies = optional_dependencies
             .map(|optional_dependencies| {
                 optional_dependencies.resolve_all(self_reference_name, None)
             })
             .transpose()?;
 
         // Resolve dependency groups, which may reference optional dependencies.
-        let resolved_dependency_groups = self
+        // At this stage, resolved_dependency_groups will contain optional dependency groups as well.
+        let mut resolved_dependency_groups = self
             .dependency_groups
             .as_ref()
             .map(|dependency_groups| {
@@ -40,6 +54,15 @@ impl PyProjectToml {
                     .resolve_all(self_reference_name, resolved_optional_dependencies.clone())
             })
             .transpose()?;
+
+        // Remove optional dependency groups from the resolved dependency groups.
+        if let (Some(resolved_groups), Some(optional_dependencies)) =
+            (resolved_dependency_groups.as_mut(), optional_dependencies)
+        {
+            for key in optional_dependencies.keys() {
+                resolved_groups.shift_remove(key);
+            }
+        }
 
         Ok((resolved_optional_dependencies, resolved_dependency_groups))
     }
@@ -222,5 +245,42 @@ dev = ["spam[test]"]
             dependency_groups.unwrap()["dev"],
             vec![Requirement::from_str("pytest").unwrap()]
         );
+    }
+
+    #[test]
+    fn test_name_collision() {
+        let source = r#"[project]
+name = "spam"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[dependency-groups]
+dev = ["ruff"]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let err = project_toml.resolve().unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Group `dev` is defined in both `project.optional-dependencies` and `dependency-groups`"
+        );
+    }
+
+    #[test]
+    fn test_optional_dependencies_are_not_dependency_groups() {
+        let source = r#"[project]
+name = "spam"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[dependency-groups]
+dev = ["spam[test]"]
+"#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let (optional_dependencies, dependency_groups) = project_toml.resolve().unwrap();
+        assert!(optional_dependencies.unwrap().contains_key("test"));
+        assert!(!dependency_groups.as_ref().unwrap().contains_key("test"));
+        assert!(dependency_groups.unwrap().contains_key("dev"));
     }
 }
