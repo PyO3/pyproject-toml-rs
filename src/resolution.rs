@@ -111,10 +111,7 @@ impl PyProjectToml {
     ///  - there is a name collision between optional dependencies and dependency groups.
     pub fn resolve(
         &self,
-    ) -> Result<
-        (Option<ResolvedDependencies>, Option<ResolvedDependencies>),
-        RecursionResolutionError,
-    > {
+    ) -> Result<(ResolvedDependencies, ResolvedDependencies), RecursionResolutionError> {
         let self_reference_name = self.project.as_ref().map(|p| p.name.as_str());
         let optional_dependencies = self
             .project
@@ -168,18 +165,7 @@ impl PyProjectToml {
             }
         }
 
-        Ok((
-            if resolved_optional_dependencies.is_empty() {
-                None
-            } else {
-                Some(resolved_optional_dependencies)
-            },
-            if resolved_dependency_groups.is_empty() {
-                None
-            } else {
-                Some(resolved_dependency_groups)
-            },
-        ))
+        Ok((resolved_optional_dependencies, resolved_dependency_groups))
     }
 }
 
@@ -252,7 +238,7 @@ mod tests {
         let (optional_dependencies, _) = project_toml.resolve().unwrap();
 
         assert_eq!(
-            optional_dependencies.unwrap()["iota"],
+            optional_dependencies["iota"],
             vec![
                 Requirement::from_str("beta").unwrap(),
                 Requirement::from_str("gamma").unwrap(),
@@ -308,7 +294,7 @@ mod tests {
         let (_, dependency_groups) = project_toml.resolve().unwrap();
 
         assert_eq!(
-            dependency_groups.unwrap()["iota"],
+            dependency_groups["iota"],
             vec![
                 Requirement::from_str("beta").unwrap(),
                 Requirement::from_str("gamma").unwrap(),
@@ -359,7 +345,7 @@ mod tests {
         let project_toml = PyProjectToml::new(source).unwrap();
         let (_, dependency_groups) = project_toml.resolve().unwrap();
         assert_eq!(
-            dependency_groups.unwrap()["dev"],
+            dependency_groups["dev"],
             vec![Requirement::from_str("pytest").unwrap()]
         );
     }
@@ -398,8 +384,8 @@ mod tests {
         "#;
         let project_toml = PyProjectToml::new(source).unwrap();
         let (optional_dependencies, dependency_groups) = project_toml.resolve().unwrap();
-        assert!(optional_dependencies.unwrap().contains_key("test"));
-        assert!(!dependency_groups.as_ref().unwrap().contains_key("test"));
-        assert!(dependency_groups.unwrap().contains_key("dev"));
+        assert!(optional_dependencies.contains_key("test"));
+        assert!(!dependency_groups.contains_key("test"));
+        assert!(dependency_groups.contains_key("dev"));
     }
 }
