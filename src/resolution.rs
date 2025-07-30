@@ -129,41 +129,38 @@ impl PyProjectToml {
             }
         }
 
+        let mut resolved_dependencies = IndexMap::new();
+
         // Resolve optional dependencies
-        let mut resolved_optional_dependencies = IndexMap::new();
         if let Some(optional_dependencies_map) = optional_dependencies {
             for group in optional_dependencies_map.keys() {
                 resolve_group(
                     optional_dependencies_map,
                     group,
-                    &mut resolved_optional_dependencies,
+                    &mut resolved_dependencies,
                     &mut Vec::new(),
                     self_reference_name,
                 )?;
             }
         }
+        let optional_dependencies_count = resolved_dependencies.len();
 
         // Resolve dependency groups, which may reference optional dependencies.
-        // Start with a clone of resolved_optional_dependencies so that dependency groups can reference them.
-        let mut resolved_dependency_groups = resolved_optional_dependencies.clone();
         if let Some(dependency_groups_map) = self.dependency_groups.as_ref() {
             for group in dependency_groups_map.keys() {
                 resolve_group(
                     dependency_groups_map,
                     group,
-                    &mut resolved_dependency_groups,
+                    &mut resolved_dependencies,
                     &mut Vec::new(),
                     self_reference_name,
                 )?;
             }
         }
 
-        // Remove optional dependency groups from the resolved dependency groups.
-        if let Some(optional_dependencies_map) = optional_dependencies {
-            for key in optional_dependencies_map.keys() {
-                resolved_dependency_groups.shift_remove(key);
-            }
-        }
+        let resolved_dependency_groups =
+            resolved_dependencies.split_off(optional_dependencies_count);
+        let resolved_optional_dependencies = resolved_dependencies;
 
         Ok((resolved_optional_dependencies, resolved_dependency_groups))
     }
