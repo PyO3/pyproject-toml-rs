@@ -83,7 +83,7 @@ pub struct Project {
     /// Project dependencies
     pub dependencies: Option<Vec<Requirement>>,
     /// Optional dependencies
-    pub optional_dependencies: Option<OptionalDependencies>,
+    pub optional_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
     pub dynamic: Option<Vec<String>>,
@@ -112,19 +112,6 @@ impl Project {
             optional_dependencies: None,
             dynamic: None,
         }
-    }
-}
-
-/// The `[project.optional-dependencies]` section of pyproject.toml
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(transparent)]
-pub struct OptionalDependencies(pub IndexMap<String, Vec<Requirement>>);
-
-impl Deref for OptionalDependencies {
-    type Target = IndexMap<String, Vec<Requirement>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
