@@ -53,21 +53,6 @@ pub fn resolve_group<'a, T: DependencyEntry>(
     Ok(())
 }
 
-/// A trait that defines how to parse a recursion item.
-pub trait DependencyEntry {
-    /// Parse the item into a requirement or a reference to other groups.
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a>;
-    /// The name of the group in the TOML file.
-    fn group_name() -> String;
-    /// The name of the table in the TOML file.
-    fn table_name() -> String;
-}
-
-pub enum Item<'a> {
-    Requirement(Requirement),
-    Groups(Vec<&'a str>),
-}
-
 #[derive(Debug, Error)]
 pub enum RecursionResolutionError {
     #[error("Failed to find {0} `{1}` included by `{2}`")]
@@ -96,6 +81,69 @@ impl std::fmt::Display for Cycle {
         }
         write!(f, " -> `{first}`")?;
         Ok(())
+    }
+}
+
+/// A trait that defines how to parse a recursion item.
+pub trait DependencyEntry {
+    /// Parse the item into a requirement or a reference to other groups.
+    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a>;
+    /// The name of the group in the TOML file.
+    fn group_name() -> String;
+    /// The name of the table in the TOML file.
+    fn table_name() -> String;
+}
+
+pub enum Item<'a> {
+    Requirement(Requirement),
+    Groups(Vec<&'a str>),
+}
+
+impl DependencyEntry for Requirement {
+    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
+        if name.map(|n| n == self.name.to_string()).unwrap_or(false) {
+            Item::Groups(self.extras.iter().map(|extra| extra.as_ref()).collect())
+        } else {
+            Item::Requirement(self.clone())
+        }
+    }
+    fn table_name() -> String {
+        "project.optional-dependencies".to_string()
+    }
+    fn group_name() -> String {
+        "optional dependency group".to_string()
+    }
+}
+
+impl DependencyEntry for DependencyGroupSpecifier {
+    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
+        match self {
+            DependencyGroupSpecifier::String(requirement) => {
+                if name
+                    .map(|n| n == requirement.name.to_string())
+                    .unwrap_or(false)
+                {
+                    Item::Groups(
+                        requirement
+                            .extras
+                            .iter()
+                            .map(|extra| extra.as_ref())
+                            .collect(),
+                    )
+                } else {
+                    Item::Requirement(requirement.clone())
+                }
+            }
+            DependencyGroupSpecifier::Table {
+                include_group: group,
+            } => Item::Groups(vec![group]),
+        }
+    }
+    fn table_name() -> String {
+        "dependency-groups".to_string()
+    }
+    fn group_name() -> String {
+        "dependency group".to_string()
     }
 }
 
@@ -163,54 +211,6 @@ impl PyProjectToml {
         let resolved_optional_dependencies = resolved_dependencies;
 
         Ok((resolved_optional_dependencies, resolved_dependency_groups))
-    }
-}
-
-impl DependencyEntry for Requirement {
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
-        if name.map(|n| n == self.name.to_string()).unwrap_or(false) {
-            Item::Groups(self.extras.iter().map(|extra| extra.as_ref()).collect())
-        } else {
-            Item::Requirement(self.clone())
-        }
-    }
-    fn table_name() -> String {
-        "project.optional-dependencies".to_string()
-    }
-    fn group_name() -> String {
-        "optional dependency group".to_string()
-    }
-}
-
-impl DependencyEntry for DependencyGroupSpecifier {
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
-        match self {
-            DependencyGroupSpecifier::String(requirement) => {
-                if name
-                    .map(|n| n == requirement.name.to_string())
-                    .unwrap_or(false)
-                {
-                    Item::Groups(
-                        requirement
-                            .extras
-                            .iter()
-                            .map(|extra| extra.as_ref())
-                            .collect(),
-                    )
-                } else {
-                    Item::Requirement(requirement.clone())
-                }
-            }
-            DependencyGroupSpecifier::Table {
-                include_group: group,
-            } => Item::Groups(vec![group]),
-        }
-    }
-    fn table_name() -> String {
-        "dependency-groups".to_string()
-    }
-    fn group_name() -> String {
-        "dependency group".to_string()
     }
 }
 
