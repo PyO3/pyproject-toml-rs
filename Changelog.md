@@ -1,8 +1,12 @@
 # Changelog
 
+## Unreleased
+
+* Update toml to 0.9
+
 ## 0.13.5
 
-* Better PEP 639 `license-files` glob validation and error messages from uv 
+* Better PEP 639 `license-files` glob validation and error messages from uv
 * A public `check_pep639_glob` function for using the PEP 639 support with a different glob crate.
 
 ## 0.13.4
