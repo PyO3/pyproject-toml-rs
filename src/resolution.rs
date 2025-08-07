@@ -4,7 +4,7 @@ use pep508_rs::Requirement;
 use thiserror::Error;
 
 /// Resolves a single dependency group or extra.
-pub fn resolve_group<'a, T: DependencyEntry>(
+fn resolve_group<'a, T: DependencyEntry>(
     groups: &'a IndexMap<String, Vec<T>>,
     group: &'a str,
     resolved: &mut IndexMap<String, Vec<Requirement>>,
@@ -15,14 +15,15 @@ pub fn resolve_group<'a, T: DependencyEntry>(
     if resolved.get(group).is_some() {
         return Ok(());
     }
+    // If the group does not exist in groups, return an error.
     let Some(items) = groups.get(group) else {
-        // If the group included in another group does not exist, return an error
-        let parent = parents.iter().last().expect("should have a parent");
-        return Err(RecursionResolutionError::GroupNotFound(
-            T::group_name(),
-            group.to_string(),
-            parent.to_string(),
-        ));
+        let parent = parents.iter().last().map(|s| s.to_string());
+        return Err(GroupNotFound {
+            group_name: T::group_name(),
+            group: group.to_string(),
+            parent,
+        }
+        .into());
     };
     // If there is a cycle in dependency groups, return an error
     if parents.contains(&group) {
@@ -55,14 +56,36 @@ pub fn resolve_group<'a, T: DependencyEntry>(
 
 #[derive(Debug, Error)]
 pub enum RecursionResolutionError {
-    #[error("Failed to find {0} `{1}` included by `{2}`")]
-    GroupNotFound(String, String, String),
+    #[error(transparent)]
+    GroupNotFound(#[from] GroupNotFound),
     #[error("Detected a cycle in `{0}`: {1}")]
     DependencyGroupCycle(String, Cycle),
     #[error(
         "Group `{0}` is defined in both `project.optional-dependencies` and `dependency-groups`"
     )]
     NameCollision(String),
+}
+
+#[derive(Debug, Error)]
+pub struct GroupNotFound {
+    group_name: String,
+    group: String,
+    parent: Option<String>,
+}
+
+impl std::fmt::Display for GroupNotFound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            group_name,
+            group,
+            parent,
+        } = self;
+        write!(f, "Failed to find {group_name} `{group}`")?;
+        if let Some(parent) = parent {
+            write!(f, " included by `{parent}`")?;
+        }
+        Ok(())
+    }
 }
 
 /// A cycle in the recursion.
@@ -85,7 +108,7 @@ impl std::fmt::Display for Cycle {
 }
 
 /// A trait that defines how to parse a recursion item.
-pub trait DependencyEntry {
+trait DependencyEntry {
     /// Parse the item into a requirement or a reference to other groups.
     fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a>;
     /// The name of the group in the TOML file.
@@ -94,7 +117,7 @@ pub trait DependencyEntry {
     fn table_name() -> String;
 }
 
-pub enum Item<'a> {
+enum Item<'a> {
     Requirement(Requirement),
     Groups(Vec<&'a str>),
 }
@@ -216,10 +239,11 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
+    use indexmap::IndexMap;
     use pep508_rs::Requirement;
     use std::str::FromStr;
 
-    use crate::PyProjectToml;
+    use crate::{resolution::resolve_group, PyProjectToml};
 
     #[test]
     fn test_parse_pyproject_toml_optional_dependencies_resolve() {
@@ -277,6 +301,37 @@ mod tests {
             project_toml.resolve().unwrap_err().to_string(),
             String::from("Failed to find optional dependency group `alpha` included by `iota`")
         )
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml_optional_dependencies_missing_top_level() {
+        let source = r#"
+            [project]
+            name = "spam"
+
+            [project.optional-dependencies]
+            alpha = ["beta"]
+        "#;
+        let project_toml = PyProjectToml::new(source).unwrap();
+        let mut resolved = IndexMap::new();
+        let err = resolve_group(
+            project_toml
+                .project
+                .as_ref()
+                .unwrap()
+                .optional_dependencies
+                .as_ref()
+                .unwrap(),
+            "foo",
+            &mut resolved,
+            &mut Vec::new(),
+            Some("spam"),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Failed to find optional dependency group `foo`"
+        );
     }
 
     #[test]
