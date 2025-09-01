@@ -11,7 +11,7 @@ jobs:
     name: Lint Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - run: rustup component add clippy rustfmt
       - name: Rustfmt
@@ -36,14 +36,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - run: cargo test
 
   check-wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo check --target wasm32-unknown-unknown
