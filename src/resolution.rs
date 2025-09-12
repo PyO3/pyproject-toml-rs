@@ -1,252 +1,242 @@
-use crate::{DependencyGroupSpecifier, PyProjectToml};
+use crate::{DependencyGroupSpecifier, DependencyGroups, ResolvedDependencies};
 use indexmap::IndexMap;
 use pep508_rs::Requirement;
+use std::fmt::Display;
 use thiserror::Error;
 
-/// Resolves a single dependency group or extra.
-fn resolve_group<'a, T: DependencyEntry>(
-    groups: &'a IndexMap<String, Vec<T>>,
-    group: &'a str,
-    resolved: &mut IndexMap<String, Vec<Requirement>>,
-    parents: &mut Vec<&'a str>,
-    project_name: Option<&'a str>,
-) -> Result<(), RecursionResolutionError> {
-    // If the group has already been resolved, exit early
-    if resolved.get(group).is_some() {
-        return Ok(());
-    }
-    // If the group does not exist in groups, return an error.
-    let Some(items) = groups.get(group) else {
-        let parent = parents.iter().last().map(|s| s.to_string());
-        return Err(GroupNotFound {
-            group_name: T::group_name(),
-            group: group.to_string(),
-            parent,
-        }
-        .into());
-    };
-    // If there is a cycle in dependency groups, return an error
-    if parents.contains(&group) {
-        return Err(RecursionResolutionError::DependencyGroupCycle(
-            T::table_name(),
-            Cycle(parents.iter().map(|s| s.to_string()).collect()),
-        ));
-    }
-    // Otherwise, perform recursion, as required, on the dependency group's specifiers
-    parents.push(group);
-    let mut requirements = Vec::with_capacity(items.len());
-    for spec in items.iter() {
-        match spec.parse(project_name) {
-            // It's a requirement. Just add it to the Vec of resolved requirements
-            Item::Requirement(requirement) => requirements.push(requirement.clone()),
-            // It's a reference to other groups. Recurse into them
-            Item::Groups(inner_groups) => {
-                for group in inner_groups {
-                    resolve_group(groups, group, resolved, parents, project_name)?;
-                    requirements.extend(resolved.get(group).into_iter().flatten().cloned());
-                }
-            }
-        }
-    }
-    // Add the resolved group to IndexMap
-    resolved.insert(group.to_string(), requirements.clone());
-    parents.pop();
-    Ok(())
-}
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct ResolveError(#[from] ResolveErrorKind);
 
 #[derive(Debug, Error)]
-pub enum RecursionResolutionError {
-    #[error(transparent)]
-    GroupNotFound(#[from] GroupNotFound),
-    #[error("Detected a cycle in `{0}`: {1}")]
-    DependencyGroupCycle(String, Cycle),
-    #[error(
-        "Group `{0}` is defined in both `project.optional-dependencies` and `dependency-groups`"
-    )]
-    NameCollision(String),
-}
-
-#[derive(Debug, Error)]
-pub struct GroupNotFound {
-    group_name: String,
-    group: String,
-    parent: Option<String>,
-}
-
-impl std::fmt::Display for GroupNotFound {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self {
-            group_name,
-            group,
-            parent,
-        } = self;
-        write!(f, "Failed to find {group_name} `{group}`")?;
-        if let Some(parent) = parent {
-            write!(f, " included by `{parent}`")?;
-        }
-        Ok(())
-    }
+pub enum ResolveErrorKind {
+    #[error("Failed to find optional dependency `{name}` included by {included_by}")]
+    OptionalDependencyNotFound { name: String, included_by: Item },
+    #[error("Failed to find dependency group `{name}` included by {included_by}")]
+    DependencyGroupNotFound { name: String, included_by: Item },
+    #[error("Cycles are not supported: {0}")]
+    DependencyGroupCycle(Cycle),
 }
 
 /// A cycle in the recursion.
 #[derive(Debug)]
-pub struct Cycle(Vec<String>);
+pub struct Cycle(Vec<Item>);
 
 /// Display a cycle, e.g., `a -> b -> c -> a`.
-impl std::fmt::Display for Cycle {
+impl Display for Cycle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let [first, rest @ ..] = self.0.as_slice() else {
+        let Some((first, rest)) = self.0.split_first() else {
             return Ok(());
         };
-        write!(f, "`{first}`")?;
+        write!(f, "{first}")?;
         for group in rest {
-            write!(f, " -> `{group}`")?;
+            write!(f, " -> {group}")?;
         }
-        write!(f, " -> `{first}`")?;
+        write!(f, " -> {first}")?;
         Ok(())
     }
 }
 
-/// A trait that defines how to parse a recursion item.
-trait DependencyEntry {
-    /// Parse the item into a requirement or a reference to other groups.
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a>;
-    /// The name of the group in the TOML file.
-    fn group_name() -> String;
-    /// The name of the table in the TOML file.
-    fn table_name() -> String;
+/// A reference to either an optional dependency or a dependency group.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Item {
+    Extra(String),
+    Group(String),
 }
 
-enum Item<'a> {
-    Requirement(Requirement),
-    Groups(Vec<&'a str>),
-}
-
-impl DependencyEntry for Requirement {
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
-        if name.map(|n| n == self.name.to_string()).unwrap_or(false) {
-            Item::Groups(self.extras.iter().map(|extra| extra.as_ref()).collect())
-        } else {
-            Item::Requirement(self.clone())
-        }
-    }
-    fn table_name() -> String {
-        "project.optional-dependencies".to_string()
-    }
-    fn group_name() -> String {
-        "optional dependency group".to_string()
-    }
-}
-
-impl DependencyEntry for DependencyGroupSpecifier {
-    fn parse<'a>(&'a self, name: Option<&str>) -> Item<'a> {
+impl Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DependencyGroupSpecifier::String(requirement) => {
-                if name
-                    .map(|n| n == requirement.name.to_string())
-                    .unwrap_or(false)
-                {
-                    Item::Groups(
-                        requirement
-                            .extras
-                            .iter()
-                            .map(|extra| extra.as_ref())
-                            .collect(),
-                    )
-                } else {
-                    Item::Requirement(requirement.clone())
-                }
+            Item::Extra(extra) => write!(f, "extra:{extra}",),
+            Item::Group(group) => {
+                write!(f, "group:{group}")
             }
-            DependencyGroupSpecifier::Table {
-                include_group: group,
-            } => Item::Groups(vec![group]),
         }
-    }
-    fn table_name() -> String {
-        "dependency-groups".to_string()
-    }
-    fn group_name() -> String {
-        "dependency group".to_string()
     }
 }
 
-type ResolvedDependencies = IndexMap<String, Vec<Requirement>>;
+pub(crate) fn resolve(
+    self_reference_name: Option<&str>,
+    optional_dependencies: Option<&IndexMap<String, Vec<Requirement>>>,
+    dependency_groups: Option<&DependencyGroups>,
+) -> Result<ResolvedDependencies, ResolveError> {
+    let mut resolved_dependencies = ResolvedDependencies::default();
 
-impl PyProjectToml {
-    /// Resolve the optional dependencies and dependency groups into flat lists of requirements.
-    ///
-    /// This function will recursively resolve all optional dependency groups and dependency groups,
-    /// including those that reference other groups. It will return an error if
-    ///  - there is a cycle in the groups,
-    ///  - a group references another group that does not exist, or
-    ///  - there is a name collision between optional dependencies and dependency groups.
-    pub fn resolve(
-        &self,
-    ) -> Result<(ResolvedDependencies, ResolvedDependencies), RecursionResolutionError> {
-        let self_reference_name = self.project.as_ref().map(|p| p.name.as_str());
-        let optional_dependencies = self
-            .project
-            .as_ref()
-            .and_then(|p| p.optional_dependencies.as_ref());
+    // Resolve optional dependencies, which may only reference optional dependencies.
+    if let Some(optional_dependencies) = optional_dependencies {
+        for extra in optional_dependencies.keys() {
+            resolve_optional_dependency(
+                extra,
+                optional_dependencies,
+                &mut resolved_dependencies,
+                &mut Vec::new(),
+                self_reference_name,
+            )?;
+        }
+    }
 
-        // Check for collisions between optional dependencies and dependency groups.
-        if let (Some(optional_dependencies), Some(dependency_groups)) =
-            (optional_dependencies, self.dependency_groups.as_ref())
+    // Resolve dependency groups, which may reference dependency groups and optional dependencies.
+    if let Some(dependency_groups) = dependency_groups {
+        for group in dependency_groups.keys() {
+            // It's a reference to other groups. Recurse into them
+            resolve_dependency_group(
+                group,
+                optional_dependencies.unwrap_or(&IndexMap::default()),
+                dependency_groups,
+                &mut resolved_dependencies,
+                &mut Vec::new(),
+                self_reference_name,
+            )?;
+        }
+    }
+
+    Ok(resolved_dependencies)
+}
+
+/// Resolves a single optional dependency.
+fn resolve_optional_dependency(
+    extra: &str,
+    optional_dependencies: &IndexMap<String, Vec<Requirement>>,
+    resolved: &mut ResolvedDependencies,
+    parents: &mut Vec<Item>,
+    project_name: Option<&str>,
+) -> Result<Vec<Requirement>, ResolveError> {
+    if let Some(requirements) = resolved.optional_dependencies.get(extra) {
+        return Ok(requirements.clone());
+    }
+
+    let Some(unresolved_requirements) = optional_dependencies.get(extra) else {
+        let parent = parents
+            .iter()
+            .last()
+            .expect("missing optional dependency must have parent")
+            .clone();
+        return Err(ResolveErrorKind::OptionalDependencyNotFound {
+            name: extra.to_string(),
+            included_by: parent,
+        }
+        .into());
+    };
+
+    // Check for cycles
+    let item = Item::Extra(extra.to_string());
+    if parents.contains(&item) {
+        return Err(ResolveErrorKind::DependencyGroupCycle(Cycle(parents.clone())).into());
+    }
+    parents.push(item);
+
+    // Recurse into references, and add their resolved requirements to our own requirements.
+    let mut resolved_requirements = Vec::with_capacity(unresolved_requirements.len());
+    for unresolved_requirement in unresolved_requirements.iter() {
+        // TODO: This should become a `PackageName` in the next breaking release.
+        if project_name
+            .is_some_and(|project_name| project_name == unresolved_requirement.name.to_string())
         {
-            for group in optional_dependencies.keys() {
-                if dependency_groups.contains_key(group) {
-                    return Err(RecursionResolutionError::NameCollision(group.clone()));
+            // Resolve each extra individually, as each refers to a different optional
+            // dependency entry.
+            for extra in &unresolved_requirement.extras {
+                let extra_string = extra.to_string();
+                resolved_requirements.extend(resolve_optional_dependency(
+                    &extra_string,
+                    optional_dependencies,
+                    resolved,
+                    parents,
+                    project_name,
+                )?);
+            }
+        } else {
+            resolved_requirements.push(unresolved_requirement.clone())
+        }
+    }
+    resolved
+        .optional_dependencies
+        .insert(extra.to_string(), resolved_requirements.clone());
+    parents.pop();
+    Ok(resolved_requirements)
+}
+
+/// Resolves a single dependency group.
+fn resolve_dependency_group(
+    dep_group: &String,
+    optional_dependencies: &IndexMap<String, Vec<Requirement>>,
+    dependency_groups: &DependencyGroups,
+    resolved: &mut ResolvedDependencies,
+    parents: &mut Vec<Item>,
+    project_name: Option<&str>,
+) -> Result<Vec<Requirement>, ResolveError> {
+    if let Some(requirements) = resolved.dependency_groups.get(dep_group) {
+        return Ok(requirements.clone());
+    }
+
+    let Some(unresolved_requirements) = dependency_groups.get(dep_group) else {
+        let parent = parents
+            .iter()
+            .last()
+            .expect("missing optional dependency must have parent")
+            .clone();
+        return Err(ResolveErrorKind::DependencyGroupNotFound {
+            name: dep_group.to_string(),
+            included_by: parent,
+        }
+        .into());
+    };
+
+    // Check for cycles
+    let item = Item::Group(dep_group.to_string());
+    if parents.contains(&item) {
+        return Err(ResolveErrorKind::DependencyGroupCycle(Cycle(parents.clone())).into());
+    }
+    parents.push(item);
+
+    // Otherwise, perform recursion, as required, on the dependency group's specifiers
+    let mut resolved_requirements = Vec::with_capacity(unresolved_requirements.len());
+    for unresolved_requirement in unresolved_requirements.iter() {
+        match unresolved_requirement {
+            DependencyGroupSpecifier::String(spec) => {
+                if project_name.is_some_and(|project_name| project_name == spec.name.to_string()) {
+                    for extra in &spec.extras {
+                        resolved_requirements.extend(resolve_optional_dependency(
+                            extra.as_ref(),
+                            optional_dependencies,
+                            resolved,
+                            parents,
+                            project_name,
+                        )?);
+                    }
+                } else {
+                    resolved_requirements.push(spec.clone())
                 }
             }
-        }
-
-        let mut resolved_dependencies = IndexMap::new();
-
-        // Resolve optional dependencies
-        if let Some(optional_dependencies_map) = optional_dependencies {
-            for group in optional_dependencies_map.keys() {
-                resolve_group(
-                    optional_dependencies_map,
-                    group,
-                    &mut resolved_dependencies,
-                    &mut Vec::new(),
-                    self_reference_name,
-                )?;
+            DependencyGroupSpecifier::Table { include_group } => {
+                resolved_requirements.extend(resolve_dependency_group(
+                    include_group,
+                    optional_dependencies,
+                    dependency_groups,
+                    resolved,
+                    parents,
+                    project_name,
+                )?);
             }
         }
-        let optional_dependencies_count = resolved_dependencies.len();
-
-        // Resolve dependency groups, which may reference optional dependencies.
-        if let Some(dependency_groups_map) = self.dependency_groups.as_ref() {
-            for group in dependency_groups_map.keys() {
-                resolve_group(
-                    dependency_groups_map,
-                    group,
-                    &mut resolved_dependencies,
-                    &mut Vec::new(),
-                    self_reference_name,
-                )?;
-            }
-        }
-
-        let resolved_dependency_groups =
-            resolved_dependencies.split_off(optional_dependencies_count);
-        let resolved_optional_dependencies = resolved_dependencies;
-
-        Ok((resolved_optional_dependencies, resolved_dependency_groups))
     }
+    // Add the resolved group to IndexMap
+    resolved
+        .dependency_groups
+        .insert(dep_group.to_string(), resolved_requirements.clone());
+    parents.pop();
+    Ok(resolved_requirements)
 }
 
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
     use pep508_rs::Requirement;
     use std::str::FromStr;
 
-    use crate::{resolution::resolve_group, PyProjectToml};
+    use crate::resolution::{resolve_optional_dependency, Item};
+    use crate::{PyProjectToml, ResolvedDependencies};
 
     #[test]
-    fn test_parse_pyproject_toml_optional_dependencies_resolve() {
+    fn parse_pyproject_toml_optional_dependencies_resolve() {
         let source = r#"[project]
             name = "spam"
 
@@ -255,11 +245,11 @@ mod tests {
             epsilon = ["eta<2.0", "theta==2024.09.01"]
             iota = ["spam[alpha]"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let (optional_dependencies, _) = project_toml.resolve().unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
 
         assert_eq!(
-            optional_dependencies["iota"],
+            resolved_dependencies.optional_dependencies["iota"],
             vec![
                 Requirement::from_str("beta").unwrap(),
                 Requirement::from_str("gamma").unwrap(),
@@ -269,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_pyproject_toml_optional_dependencies_cycle() {
+    fn parse_pyproject_toml_optional_dependencies_cycle() {
         let source = r#"
             [project]
             name = "spam"
@@ -278,17 +268,15 @@ mod tests {
             alpha = ["spam[iota]"]
             iota = ["spam[alpha]"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
         assert_eq!(
-            project_toml.resolve().unwrap_err().to_string(),
-            String::from(
-                "Detected a cycle in `project.optional-dependencies`: `alpha` -> `iota` -> `alpha`"
-            )
+            pyproject_toml.resolve().unwrap_err().to_string(),
+            "Cycles are not supported: extra:alpha -> extra:iota -> extra:alpha"
         )
     }
 
     #[test]
-    fn test_parse_pyproject_toml_optional_dependencies_missing_include() {
+    fn parse_pyproject_toml_optional_dependencies_missing_include() {
         let source = r#"
             [project]
             name = "spam"
@@ -296,15 +284,15 @@ mod tests {
             [project.optional-dependencies]
             iota = ["spam[alpha]"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
         assert_eq!(
-            project_toml.resolve().unwrap_err().to_string(),
-            String::from("Failed to find optional dependency group `alpha` included by `iota`")
+            pyproject_toml.resolve().unwrap_err().to_string(),
+            "Failed to find optional dependency `alpha` included by extra:iota"
         )
     }
 
     #[test]
-    fn test_parse_pyproject_toml_optional_dependencies_missing_top_level() {
+    fn parse_pyproject_toml_optional_dependencies_missing_top_level() {
         let source = r#"
             [project]
             name = "spam"
@@ -312,41 +300,41 @@ mod tests {
             [project.optional-dependencies]
             alpha = ["beta"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let mut resolved = IndexMap::new();
-        let err = resolve_group(
-            project_toml
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let mut resolved = ResolvedDependencies::default();
+        let err = resolve_optional_dependency(
+            "foo",
+            pyproject_toml
                 .project
                 .as_ref()
                 .unwrap()
                 .optional_dependencies
                 .as_ref()
                 .unwrap(),
-            "foo",
             &mut resolved,
-            &mut Vec::new(),
+            &mut vec![Item::Extra("bar".to_string())],
             Some("spam"),
         )
         .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "Failed to find optional dependency group `foo`"
+            "Failed to find optional dependency `foo` included by extra:bar"
         );
     }
 
     #[test]
-    fn test_parse_pyproject_toml_dependency_groups_resolve() {
+    fn parse_pyproject_toml_dependency_groups_resolve() {
         let source = r#"
             [dependency-groups]
             alpha = ["beta", "gamma", "delta"]
             epsilon = ["eta<2.0", "theta==2024.09.01"]
             iota = [{include-group = "alpha"}]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let (_, dependency_groups) = project_toml.resolve().unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
 
         assert_eq!(
-            dependency_groups["iota"],
+            resolved_dependencies.dependency_groups["iota"],
             vec![
                 Requirement::from_str("beta").unwrap(),
                 Requirement::from_str("gamma").unwrap(),
@@ -356,34 +344,34 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_pyproject_toml_dependency_groups_cycle() {
+    fn parse_pyproject_toml_dependency_groups_cycle() {
         let source = r#"
             [dependency-groups]
             alpha = [{include-group = "iota"}]
             iota = [{include-group = "alpha"}]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
         assert_eq!(
-            project_toml.resolve().unwrap_err().to_string(),
-            String::from("Detected a cycle in `dependency-groups`: `alpha` -> `iota` -> `alpha`")
+            pyproject_toml.resolve().unwrap_err().to_string(),
+            "Cycles are not supported: group:alpha -> group:iota -> group:alpha"
         )
     }
 
     #[test]
-    fn test_parse_pyproject_toml_dependency_groups_missing_include() {
+    fn parse_pyproject_toml_dependency_groups_missing_include() {
         let source = r#"
             [dependency-groups]
             iota = [{include-group = "alpha"}]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
         assert_eq!(
-            project_toml.resolve().unwrap_err().to_string(),
-            String::from("Failed to find dependency group `alpha` included by `iota`")
+            pyproject_toml.resolve().unwrap_err().to_string(),
+            "Failed to find dependency group `alpha` included by group:iota"
         )
     }
 
     #[test]
-    fn test_parse_pyproject_toml_dependency_groups_with_optional_dependencies() {
+    fn parse_pyproject_toml_dependency_groups_with_optional_dependencies() {
         let source = r#"
             [project]
             name = "spam"
@@ -394,16 +382,16 @@ mod tests {
             [dependency-groups]
             dev = ["spam[test]"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let (_, dependency_groups) = project_toml.resolve().unwrap();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
         assert_eq!(
-            dependency_groups["dev"],
+            resolved_dependencies.dependency_groups["dev"],
             vec![Requirement::from_str("pytest").unwrap()]
         );
     }
 
     #[test]
-    fn test_name_collision() {
+    fn name_collision() {
         let source = r#"
             [project]
             name = "spam"
@@ -414,16 +402,20 @@ mod tests {
             [dependency-groups]
             dev = ["ruff"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let err = project_toml.resolve().unwrap_err();
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
         assert_eq!(
-            err.to_string(),
-            "Group `dev` is defined in both `project.optional-dependencies` and `dependency-groups`"
+            resolved_dependencies.optional_dependencies["dev"],
+            vec![Requirement::from_str("pytest").unwrap()]
+        );
+        assert_eq!(
+            resolved_dependencies.dependency_groups["dev"],
+            vec![Requirement::from_str("ruff").unwrap()]
         );
     }
 
     #[test]
-    fn test_optional_dependencies_are_not_dependency_groups() {
+    fn optional_dependencies_are_not_dependency_groups() {
         let source = r#"
             [project]
             name = "spam"
@@ -434,10 +426,38 @@ mod tests {
             [dependency-groups]
             dev = ["spam[test]"]
         "#;
-        let project_toml = PyProjectToml::new(source).unwrap();
-        let (optional_dependencies, dependency_groups) = project_toml.resolve().unwrap();
-        assert!(optional_dependencies.contains_key("test"));
-        assert!(!dependency_groups.contains_key("test"));
-        assert!(dependency_groups.contains_key("dev"));
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
+        assert!(resolved_dependencies
+            .optional_dependencies
+            .contains_key("test"));
+        assert!(!resolved_dependencies.dependency_groups.contains_key("test"));
+        assert!(resolved_dependencies.dependency_groups.contains_key("dev"));
+    }
+
+    #[test]
+    fn mixed_resolution() {
+        let source = r#"
+            [project]
+            name = "spam"
+
+            [project.optional-dependencies]
+            test = ["pytest"]
+            numpy = ["numpy"]
+
+            [dependency-groups]
+            dev = ["spam[test]"]
+            test = ["spam[numpy]"]
+        "#;
+        let pyproject_toml = PyProjectToml::new(source).unwrap();
+        let resolved_dependencies = pyproject_toml.resolve().unwrap();
+        assert_eq!(
+            resolved_dependencies.dependency_groups["dev"],
+            vec![Requirement::from_str("pytest").unwrap()]
+        );
+        assert_eq!(
+            resolved_dependencies.dependency_groups["test"],
+            vec![Requirement::from_str("numpy").unwrap()]
+        );
     }
 }
