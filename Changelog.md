@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.13.6
+
+* Support resolving optional dependencies and dependency groups
 * Update toml to 0.9
 
 ## 0.13.5
