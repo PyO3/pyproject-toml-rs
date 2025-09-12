@@ -1,14 +1,15 @@
 #[cfg(feature = "pep639-glob")]
 mod pep639_glob;
+mod resolution;
 
 #[cfg(feature = "pep639-glob")]
 pub use pep639_glob::{check_pep639_glob, parse_pep639_glob, Pep639GlobError};
-
-pub mod pep735_resolve;
+pub use resolution::ResolveError;
 
 use indexmap::IndexMap;
 use pep440_rs::{Version, VersionSpecifiers};
 use pep508_rs::Requirement;
+use resolution::resolve;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -42,6 +43,7 @@ pub struct PyProjectToml {
 #[serde(rename_all = "kebab-case")]
 pub struct Project {
     /// The name of the project
+    // TODO: This should become a `PackageName` in the next breaking release.
     pub name: String,
     /// The version of the project as supported by PEP 440
     pub version: Option<Version>,
@@ -83,6 +85,7 @@ pub struct Project {
     /// Project dependencies
     pub dependencies: Option<Vec<Requirement>>,
     /// Optional dependencies
+    // TODO: The `String` should become a `ExtraName` in the next breaking release.
     pub optional_dependencies: Option<IndexMap<String, Vec<Requirement>>>,
     /// Specifies which fields listed by PEP 621 were intentionally unspecified
     /// so another tool can/will provide such metadata dynamically.
@@ -198,8 +201,9 @@ impl Contact {
 }
 
 /// The `[dependency-groups]` section of pyproject.toml, as specified in PEP 735
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq, Eq)]
 #[serde(transparent)]
+// TODO: The `String` should become a `ExtraName` in the next breaking release.
 pub struct DependencyGroups(pub IndexMap<String, Vec<DependencyGroupSpecifier>>);
 
 impl Deref for DependencyGroups {
@@ -225,10 +229,49 @@ pub enum DependencyGroupSpecifier {
     },
 }
 
+/// Optional dependencies and dependency groups resolved into flat lists of requirements that are
+/// not self-referential
+///
+/// Note that `project.name` is required to resolve self-referential optional dependencies
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ResolvedDependencies {
+    pub optional_dependencies: IndexMap<String, Vec<Requirement>>,
+    pub dependency_groups: IndexMap<String, Vec<Requirement>>,
+}
+
 impl PyProjectToml {
     /// Parse `pyproject.toml` content
     pub fn new(content: &str) -> Result<Self, toml::de::Error> {
         toml::de::from_str(content)
+    }
+
+    /// Resolve the optional dependencies (extras) and dependency groups into flat lists of
+    /// requirements.
+    ///
+    /// This function will recursively resolve all optional dependency groups and dependency groups,
+    /// including those that reference other groups. It will return an error if
+    ///  - there is a cycle in the groups, or
+    ///  - a group references another group that does not exist.
+    ///
+    /// Resolving self-referential optional dependencies requires `project.name` to be set.
+    ///
+    /// Note: This method makes no guarantee about the order of items and whether duplicates are
+    /// removed or not.
+    pub fn resolve(&self) -> Result<ResolvedDependencies, ResolveError> {
+        let self_reference_name = self.project.as_ref().map(|p| p.name.as_str());
+        let optional_dependencies = self
+            .project
+            .as_ref()
+            .and_then(|p| p.optional_dependencies.as_ref());
+        let dependency_groups = self.dependency_groups.as_ref();
+
+        let resolved_dependencies = resolve(
+            self_reference_name,
+            optional_dependencies,
+            dependency_groups,
+        )?;
+
+        Ok(resolved_dependencies)
     }
 }
 
