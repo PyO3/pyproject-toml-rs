@@ -48,3 +48,11 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo check --target wasm32-unknown-unknown
 
+  minimal-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
+      - run: cargo +nightly update -Z minimal-versions
+      - run: cargo test
+
