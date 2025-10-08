@@ -113,10 +113,10 @@ fn resolve_optional_dependency(
         return Ok(requirements.clone());
     }
 
-    // Normalize the extra name for lookup according to PEP 685
     let normalized_extra = normalize_name(extra);
 
     // Find the key in optional_dependencies by comparing normalized versions
+    // TODO: next breaking release remove this once Extra is added
     let unresolved_requirements = optional_dependencies
         .iter()
         .find(|(key, _)| normalize_name(key) == normalized_extra)
