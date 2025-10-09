@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.13.6"
+version = "0.13.7"
 dependencies = [
  "glob",
  "indexmap",

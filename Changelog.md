@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.13.7
+
+* Normalize extra names in optional dependencies
+
 ## 0.13.6
 
 * Support resolving optional dependencies and dependency groups
