@@ -492,10 +492,10 @@ mod tests {
               "foo[group-one]",
               "foo[group_two]",
             ]
-            group-one = [
+            group_one = [
               "anyio>=4.9.0",
             ]
-            group_two = [
+            group-two = [
               "trio>=0.31.0",
             ]
         "#;
